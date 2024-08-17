@@ -7,16 +7,24 @@ from scipy.signal import butter, filtfilt, resample
 CONFIG_FILE = 'config.json'
 
 def carregar_parametros():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
-    return {
+    parametros_padroes = {
         'arquivo1': '',
         'arquivo2': '',
-        'freq_corte_min': 45.0,
+        'freq_amostragem': 1000.0,
         'freq_corte_max': 75.0,
         'colunas': []
     }
+
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'r') as f:
+            parametros = json.load(f)
+            # Atualiza os parâmetros com os valores padrão para chaves ausentes
+            for chave, valor_padrao in parametros_padroes.items():
+                parametros.setdefault(chave, valor_padrao)
+            return parametros
+    else:
+        return parametros_padroes
+
 
 def salvar_parametros(parametros):
     with open(CONFIG_FILE, 'w') as f:

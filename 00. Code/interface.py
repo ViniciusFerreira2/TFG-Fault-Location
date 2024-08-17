@@ -11,7 +11,7 @@ class JanelaSelecaoArquivos:
         self.root = root
         self.arquivo1 = tk.StringVar(value=parametros['arquivo1'])
         self.arquivo2 = tk.StringVar(value=parametros['arquivo2'])
-        self.freq_corte_min = tk.DoubleVar(value=parametros['freq_corte_min'])
+        self.freq_amostragem = tk.DoubleVar(value=parametros['freq_amostragem'])
         self.freq_corte_max = tk.DoubleVar(value=parametros['freq_corte_max'])
         self.parametros = parametros
 
@@ -43,10 +43,10 @@ class JanelaSelecaoArquivos:
 
         frame_frequencias = tk.Frame(self.root)
         frame_frequencias.pack(pady=10)
-        label_freq_min = tk.Label(frame_frequencias, text="Frequência de Corte Mínima (Hz):")
-        label_freq_min.grid(row=0, column=0, padx=5, sticky="w")
-        entry_freq_min = tk.Entry(frame_frequencias, textvariable=self.freq_corte_min, width=15)
-        entry_freq_min.grid(row=0, column=1, padx=5, sticky="w")
+        label_freq_amostragem = tk.Label(frame_frequencias, text="Frequência de Amostragem (Hz):")
+        label_freq_amostragem.grid(row=0, column=0, padx=5, sticky="w")
+        entry_freq_amostragem = tk.Entry(frame_frequencias, textvariable=self.freq_amostragem, width=15)
+        entry_freq_amostragem.grid(row=0, column=1, padx=5, sticky="w")
 
         label_freq_max = tk.Label(frame_frequencias, text="Frequência de Corte Máxima (Hz):")
         label_freq_max.grid(row=1, column=0, padx=5, sticky="w")
@@ -75,7 +75,7 @@ class JanelaSelecaoArquivos:
     def confirmar(self):
         self.parametros['arquivo1'] = self.arquivo1.get()
         self.parametros['arquivo2'] = self.arquivo2.get()
-        self.parametros['freq_corte_min'] = self.freq_corte_min.get()
+        self.parametros['freq_amostragem'] = self.freq_amostragem.get()
         self.parametros['freq_corte_max'] = self.freq_corte_max.get()
         salvar_parametros(self.parametros)
         self.abrir_janela_selecao_colunas()
