@@ -52,7 +52,6 @@ def calculate_vrms(signal, original_rate):
 
     # Inicializar listas para armazenar os valores de θ, módulo e ângulo
     theta_list = []
-    theta_list2 = []
     modulus_list = []
     modulus_values = []
     angle_list = []
@@ -62,35 +61,40 @@ def calculate_vrms(signal, original_rate):
     # Inicializar variáveis para o cálculo de VRMS
     limite = 16666
     squared_values = []
-    squared_values2 = []
     t=0.000001
+    sumReal = 0
+    sumImag = 0
 
-    # Cálculo linha por linha
-    for i in range(len(signal)-1):
-        # Construir a matriz X para a linha i (deve ser uma matriz 2D)
-        X_t_i = np.array([[1, np.sin(omega * t), np.cos(omega * t), t]])
-        # O valor Y correspondente é o valor do sinal na linha i
-        Y_i = np.array([signal[i]])
-        # Calcular θ para a linha i usando pseudo-inversa
-       # theta_i = np.linalg.pinv(X_t_i.T @ X_t_i) @ X_t_i.T @ Y_i
-        theta_i =np.linalg.pinv(X_t_i) @ Y_i 
-        # Adicionar o valor de θ à lista
-        theta_list.append(theta_i.flatten())  # Transformar para 1D para armazenar
+    Xt = []
+    fasores = []
+    #h = Harmonica alvo, no caso é a harmônica fundamental = 1
+    h = 1 
+    for p in range(1, 9):
+        Xt.append([np.cos((2 * np.pi * h * (p - 1)) / 8), np.sin((2 * np.pi * h * (p - 1)) / 8)])
+    Xt = np.array(Xt)
 
-        # Extraindo Theta2 e Theta3
-        Theta21 = theta_i[1]
-        Theta31 = theta_i[2]
-        # Calculando Theta2 + Theta3 * j
-        complex_number = Theta21 + Theta31 * 1j
-        squared1=complex_number**2
-       # if i == 16667:
-         #   print(complex_number)
-        # Adicionar o módulo e o módulo ao quadrado à lista
-        # modulus_list.append(modulus)
-        squared_values.append(squared1)
-        angle_list.append(np.angle(complex_number,True))
-        t+=0.000001
-        
+    for j in range(len(signal) - 7):
+        # Janela de dados analisada pela DFT
+        janela = signal[j:j+8]  # Deve ser j:j+8 para incluir 8 elementos
+
+        #sumReal = 0  # Reinicializar a cada nova janela
+        #sumImag = 0  # Reinicializar a cada nova janela
+
+        for n in range(8):
+            sumReal += janela[n] * Xt[n, 0]
+            sumImag += janela[n] * Xt[n, 1]
+
+        FasorReal = (2) / (np.sqrt(2) * 8) * sumReal
+        FasorImag = (-2) / (np.sqrt(2) * 8) * sumImag
+        num_Complexo = FasorReal + FasorImag * 1j
+
+        modulus_values.append(np.abs(num_Complexo))
+        angle_list.append(np.angle(num_Complexo,True))
+        fasores.append(num_Complexo)
+        time_new.append(j / original_rate)
+
+    
+    ''' 
     somatorio = 0
     for i in range(limite):
         if i == 0:
@@ -110,15 +114,15 @@ def calculate_vrms(signal, original_rate):
         vrms_values.append(np.sqrt(somatorio*60))  # Calcular a raiz quadrada da média
         modulus_values.append(somatorio)
         time_new.append(i / original_rate)
-
+    '''
     # Converter as listas para arrays numpy
-    vrms_array = np.array(vrms_values)
+    vrms_array = np.array(fasores)
     modulus_array = np.array(modulus_values)
     angle_array = np.array(angle_list)
     time_new_array = np.array(time_new)
 
     return vrms_array, time_new_array, modulus_array, angle_array
-
+    
 
     '''
     vrms_values = []

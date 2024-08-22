@@ -71,6 +71,8 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
             print(f"Erro: Módulo ou ângulo vazios para a coluna {coluna}")
             continue  # Pula esta coluna se os valores estiverem vazios
         
+
+        print(ang[16667])
         modulo.append(mod)
         angulo.append(ang)
         
@@ -81,7 +83,7 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
 
         # Plotagem e salvamento do gráfico de Vrms
         plt.figure(figsize=(12, 6))
-        plt.plot(time_new, vrms_values, label=f'Vrms - Canal {canais[coluna]}')
+        plt.plot(time_new, mod, label=f'Vrms - Canal {canais[coluna]}')
     
         plt.title('Vrms dos Sinais')
         plt.xlabel('Tempo (s)')
