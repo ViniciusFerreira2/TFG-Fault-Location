@@ -43,7 +43,84 @@ def process_signal(signal, original_rate=1000000, target_rate=1920, cutoff_freq=
     
     return filtered_signal
 
-def calculate_vrms(signal, sampling_rate, offset, scale_factor):
+def calculate_vrms(signal, original_rate):
+    # Conversão da taxa de amostragem de µs para segundos
+    #t = np.arange(0, len(signal)) / original_rate  # Tempo em segundos
+
+    # Frequência angular
+    omega = 2 * np.pi * 60  # 60 Hz
+
+    # Inicializar listas para armazenar os valores de θ, módulo e ângulo
+    theta_list = []
+    theta_list2 = []
+    modulus_list = []
+    modulus_values = []
+    angle_list = []
+    vrms_values = []
+    time_new = []
+
+    # Inicializar variáveis para o cálculo de VRMS
+    limite = 16666
+    squared_values = []
+    squared_values2 = []
+    t=0.000001
+
+    # Cálculo linha por linha
+    for i in range(len(signal)-1):
+        # Construir a matriz X para a linha i (deve ser uma matriz 2D)
+        X_t_i = np.array([[1, np.sin(omega * t), np.cos(omega * t), t]])
+        # O valor Y correspondente é o valor do sinal na linha i
+        Y_i = np.array([signal[i]])
+        # Calcular θ para a linha i usando pseudo-inversa
+       # theta_i = np.linalg.pinv(X_t_i.T @ X_t_i) @ X_t_i.T @ Y_i
+        theta_i =np.linalg.pinv(X_t_i) @ Y_i 
+        # Adicionar o valor de θ à lista
+        theta_list.append(theta_i.flatten())  # Transformar para 1D para armazenar
+
+        # Extraindo Theta2 e Theta3
+        Theta21 = theta_i[1]
+        Theta31 = theta_i[2]
+        # Calculando Theta2 + Theta3 * j
+        complex_number = Theta21 + Theta31 * 1j
+        squared1=complex_number**2
+       # if i == 16667:
+         #   print(complex_number)
+        # Adicionar o módulo e o módulo ao quadrado à lista
+        # modulus_list.append(modulus)
+        squared_values.append(squared1)
+        angle_list.append(np.angle(complex_number,True))
+        t+=0.000001
+        
+    somatorio = 0
+    for i in range(limite):
+        if i == 0:
+            somatorio = 0
+        else:
+            somatorio += squared_values[i]
+        vrms = np.sqrt(somatorio*60)
+        vrms_values.append(vrms)  # Calcular a raiz quadrada da média
+        modulus_values.append(somatorio)
+        #if i == 16665:
+         #   print("modulo:", vrms)
+        time_new.append(i / original_rate)
+
+    for i in range(limite, len(squared_values)):
+        somatorio -= squared_values[i - limite]
+        somatorio += squared_values[i]
+        vrms_values.append(np.sqrt(somatorio*60))  # Calcular a raiz quadrada da média
+        modulus_values.append(somatorio)
+        time_new.append(i / original_rate)
+
+    # Converter as listas para arrays numpy
+    vrms_array = np.array(vrms_values)
+    modulus_array = np.array(modulus_values)
+    angle_array = np.array(angle_list)
+    time_new_array = np.array(time_new)
+
+    return vrms_array, time_new_array, modulus_array, angle_array
+
+
+    '''
     vrms_values = []
     time_new = []
     squared_values = []
@@ -77,7 +154,7 @@ def calculate_vrms(signal, sampling_rate, offset, scale_factor):
         time_new.append(i / sampling_rate)
 
     return vrms_values, time_new
-
+'''
 def detectar_tipo_falta(vrms_values):
     if len(vrms_values) < 12:
         print("Não há dados suficientes para detectar a falta.")

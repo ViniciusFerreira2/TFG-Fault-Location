@@ -5,8 +5,32 @@ import comtrade
 from datetime import datetime
 from processamentodados import process_signal, calculate_vrms, detectar_tipo_falta
 
+def plotar_fasores(modulo, angulo, tempo_selecionado):
+    """
+    Plota um gráfico de fasores para os módulos e ângulos fornecidos em um tempo específico.
+    """
+    plt.figure(figsize=(8, 8))
+    ax = plt.subplot(111, polar=True)
+
+    for i in range(len(modulo)):
+        if len(modulo[i]) > tempo_selecionado and len(angulo[i]) > tempo_selecionado:
+            # Garantindo que os valores sejam reais
+            magnitude = np.abs(modulo[i][tempo_selecionado])  # magnitude já é real
+            theta = np.deg2rad(np.real(angulo[i][tempo_selecionado]))  # usa apenas a parte real do ângulo
+            
+            ax.arrow(theta, 0, 0, magnitude, 
+                     head_width=0.05, head_length=0.1, fc='b', ec='b')
+        else:
+            print(f"Erro: Tempo selecionado {tempo_selecionado} está fora do intervalo para a série {i}")
+
+    ax.set_ylim(0, max([max(np.abs(m)) for m in modulo]))
+    plt.title("Gráfico de Fasores")
+    plt.show()
+
 def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta):
     vrms_final = []
+    global modulo, angulo  # Variáveis para armazenar os valores de fasores
+
     arquivo1 = parametros['arquivo1']
     arquivo2 = parametros['arquivo2']
     freq_amostragem = float(parametros['freq_amostragem'])  # Frequência de amostragem fornecida na interface
@@ -31,6 +55,9 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
     pasta_nome = os.path.join(current_directory, f"Graficos_{timestamp}")
     os.makedirs(pasta_nome, exist_ok=True)
 
+    modulo = []
+    angulo = []
+
     for coluna in colunas_selecionadas:
         sinal = signals[coluna]
         channel_index = coluna
@@ -38,7 +65,15 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         offset = rec.cfg.analog_channels[channel_index].b  
 
         # Processamento do sinal
-        vrms_values, time_new = calculate_vrms(sinal, target_rate, offset, scale_factor)
+        vrms_values, time_new, mod, ang = calculate_vrms(sinal, target_rate)
+        
+        if len(mod) == 0 or len(ang) == 0:
+            print(f"Erro: Módulo ou ângulo vazios para a coluna {coluna}")
+            continue  # Pula esta coluna se os valores estiverem vazios
+        
+        modulo.append(mod)
+        angulo.append(ang)
+        
         vrms_final.append(vrms_values)
         sinal_processado = process_signal(sinal, original_rate, target_rate, cutoff_freq)
         num_samples_processado = len(sinal_processado)
@@ -47,6 +82,7 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         # Plotagem e salvamento do gráfico de Vrms
         plt.figure(figsize=(12, 6))
         plt.plot(time_new, vrms_values, label=f'Vrms - Canal {canais[coluna]}')
+    
         plt.title('Vrms dos Sinais')
         plt.xlabel('Tempo (s)')
         plt.ylabel('Vrms')
@@ -72,6 +108,11 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         plt.close()
 
     # Detecção e exibição do tipo de falta e porcentagem
-    tipo_falta, porcentagem_falta = detectar_tipo_falta(vrms_final)
-    label_tipo_falta.config(text=f"Tipo de Falta Identificada: {tipo_falta}")
-    label_porcentagem_falta.config(text=f"Porcentagem da Linha de Transmissão: {porcentagem_falta:.2f}%")
+    #tipo_falta, porcentagem_falta = detectar_tipo_falta(vrms_final)
+    #label_tipo_falta.config(text=f"Tipo de Falta Identificada: {tipo_falta}")
+    #label_porcentagem_falta.config(text=f"Porcentagem da Linha de Transmissão: {porcentagem_falta:.2f}%")
+
+    # Plotagem dos fasores no tempo zero
+    if modulo and angulo:  # Verifica se há dados para plotar
+        plotar_fasores(modulo, angulo, 0)
+
