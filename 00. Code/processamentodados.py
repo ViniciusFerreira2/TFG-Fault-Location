@@ -69,29 +69,31 @@ def calculate_vrms(signal, original_rate):
     fasores = []
     #h = Harmonica alvo, no caso é a harmônica fundamental = 1
     h = 1 
-    for p in range(1, 9):
-        Xt.append([np.cos((2 * np.pi * h * (p - 1)) / 8), np.sin((2 * np.pi * h * (p - 1)) / 8)])
+    intervalo = 1024
+    for p in range(1, (1+intervalo)):
+        Xt.append([np.cos((2 * np.pi * h * (p - 1)) / intervalo), np.sin((2 * np.pi * h * (p - 1)) / intervalo)])
     Xt = np.array(Xt)
 
-    for j in range(len(signal) - 7):
+    for j in range(len(signal) - (intervalo-1)):
         # Janela de dados analisada pela DFT
-        janela = signal[j:j+8]  # Deve ser j:j+8 para incluir 8 elementos
+        janela = signal[j:j+(intervalo)]  # Deve ser j:j+8 para incluir 8 elementos
 
         #sumReal = 0  # Reinicializar a cada nova janela
         #sumImag = 0  # Reinicializar a cada nova janela
 
-        for n in range(8):
+        for n in range(intervalo):
             sumReal += janela[n] * Xt[n, 0]
             sumImag += janela[n] * Xt[n, 1]
 
-        FasorReal = (2) / (np.sqrt(2) * 8) * sumReal
-        FasorImag = (-2) / (np.sqrt(2) * 8) * sumImag
+        FasorReal = (2) / (np.sqrt(2) * (intervalo)) * sumReal
+        FasorImag = (-2) / (np.sqrt(2) * (intervalo)) * sumImag
         num_Complexo = FasorReal + FasorImag * 1j
 
         modulus_values.append(np.abs(num_Complexo))
         angle_list.append(np.angle(num_Complexo,True))
         fasores.append(num_Complexo)
         time_new.append(j / original_rate)
+    print(fasores)
 
     
     ''' 

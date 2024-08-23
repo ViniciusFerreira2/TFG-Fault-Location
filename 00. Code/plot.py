@@ -73,6 +73,7 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         
 
         print(ang[16667])
+        print(mod[16667])
         modulo.append(mod)
         angulo.append(ang)
         
