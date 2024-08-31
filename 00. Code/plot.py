@@ -73,6 +73,7 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         print(f"003_____CRIANDO SINAL FILTRADO")
         sinal_filtrado, time_filtrado = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
         plot_filter(sinal, canais, coluna, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
+        plot_vrms(sinal_filtrado, canais, coluna, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
 
 
         sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado,time_filtrado, original_rate)

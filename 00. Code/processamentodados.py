@@ -98,7 +98,6 @@ class processamento():
             fasores.append(num_Complexo)
             time_new.append(j / original_rate)
         print(fasores)
-
         
         ''' 
         somatorio = 0
@@ -181,7 +180,8 @@ class processamento():
             squared_x2 = x2 ** 2
             area = (squared_x1 + squared_x2) * 10**(-6) / 2
             squared_values.append(area)
-        limite = round((1/60)/(time/len(time)))
+        limite = round((1/60)/(1/4800))
+        #print(limite)
 
         for i in range(limite):
             if i == 0:
