@@ -95,6 +95,7 @@ class processamento():
         omega = 2 * np.pi * 60  # 60 Hz
         sample_rate = math.floor((1/60)/(time[-1]/len(time)))
 
+        #print (sample_rate)
         yk = [] 
         xt = []
         mod_values = []
@@ -105,22 +106,15 @@ class processamento():
         for i in range(sample_rate):
             yk.append(signal[i])
             xt.append([1, math.sin(omega*time[i]),math.cos(omega*time[i]), time[i]])
+            mod_values.append(0)
+            ang_values.append(0)
 
         for j in range(sample_rate, len(signal)):
-            
-            print("&&&&")
-            print(j)
-            print("&&&&")
+
 
             xt_array = np.array(xt)
             yk_array = np.array(yk)
 
-
-            print("MATRIX XT")
-            print(xt_array)
-
-            print("MATRIX YK")
-            print(yk_array)
             xt_transpoto = xt_array.T
             yk_transpoto = yk_array.T
 
@@ -148,12 +142,14 @@ class processamento():
 
             mod_values.append(vrms)
             ang_values.append(ang)
-
+            
+            
             del yk[0] #removendo o antigo
             del xt[0] #removendo o antigo
 
             yk.append(signal[j]) # adicionando o novo valor 
             xt.append([1, math.sin(omega*time[j]),math.cos(omega*time[j]), time[j]])
+
 
         signal_modulo = np.array(mod_values)
         signal_ang = np.array(ang_values)
