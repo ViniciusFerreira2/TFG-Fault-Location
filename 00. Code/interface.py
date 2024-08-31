@@ -63,12 +63,12 @@ class JanelaSelecaoArquivos:
         botao_confirmar.pack(pady=20)
 
     def selecionar_arquivo1(self):
-        arquivo = filedialog.askopenfilename(title="Selecione o primeiro arquivo")
+        arquivo = filedialog.askopenfilename(title="Selecione o primeiro arquivo", filetypes=[("Arquivos CFG", "*.cfg")])
         if arquivo:
             self.arquivo1.set(arquivo)
 
     def selecionar_arquivo2(self):
-        arquivo = filedialog.askopenfilename(title="Selecione o segundo arquivo")
+        arquivo = filedialog.askopenfilename(title="Selecione o segundo arquivo", filetypes=[("Arquivos DAT", "*.dat")])
         if arquivo:
             self.arquivo2.set(arquivo)
 

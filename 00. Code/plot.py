@@ -45,7 +45,6 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         print("Caminhos não foram definidos corretamente.")
         return
     
-
     signals = np.array(rec.analog)
     original_rate = 1000000  # Frequência original
     target_rate = freq_amostragem  # Frequência de amostragem alvo
@@ -71,58 +70,34 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
 
         #FILTRO DOS DADOS
         print(f"003_____CRIANDO SINAL FILTRADO")
-        sinal_filtrado, time_filtrado = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
-        plot_filter(sinal, canais, coluna, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
-        plot_vrms(sinal_filtrado, canais, coluna, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
+        sinal_filtrado, time_filtrado, sample_rate = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
+        #plot_filter(sinal, canais, coluna, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
+        #print(sample_rate)
+
+        print(f"004_____Realizando o RMS")
+        sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado,time_filtrado)
+        #plot_vrms(time_filtrado, sinal_filtrado, canais, coluna, time_vrms, sinal_vrms, original_rate, timestamp, pasta_nome)
 
 
-        sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado,time_filtrado, original_rate)
+        print(f"005_____Estimando o FASOR")
+        signal_modulo, signal_ang = processamento.fasor(sinal_filtrado,time_filtrado)
 
-        #plot_vrms(sinal, canais, coluna, time_vrms, sinal_vrms, original_rate, timestamp, pasta_nome)
-
-
-
-        #CALCULO VRMS e ANGULO
-        # vrms_values, time_new, mod, ang = processamento.calculate_vrms(sinal, target_rate)
-        
-        # if len(mod) == 0 or len(ang) == 0:
-        #     print(f"Erro: Módulo ou ângulo vazios para a coluna {coluna}")
-        #     continue  # Pula esta coluna se os valores estiverem vazios
-        
-        # modulo.append(mod)
-        # angulo.append(ang)
-        
-        # vrms_final.append(vrms_values)
-        # sinal_processado = process_signal(sinal, original_rate, target_rate, cutoff_freq)
-        # num_samples_processado = len(sinal_processado)
-        # time_processado = np.linspace(0, num_samples_processado / target_rate, num_samples_processado)
-
-        # # Plotagem e salvamento do gráfico de Vrms
-        # plt.figure(figsize=(12, 6))
-        # plt.plot(time_new, mod, label=f'Vrms - Canal {canais[coluna]}')
+        modulo.append(signal_modulo)
+        angulo.append(signal_ang)
     
-        # plt.title('Vrms dos Sinais')
-        # plt.xlabel('Tempo (s)')
-        # plt.ylabel('Vrms')
-        # plt.legend()
-        # vrms_fig_name = f"Vrms_dos_Sinais_{timestamp}.png"
-        # vrms_fig_path = os.path.join(pasta_nome, vrms_fig_name)
-        # plt.savefig(vrms_fig_path)
-        # plt.show()  # Exibir o gráfico
-        # plt.close()
+    plot_fasor(modulo, angulo)
 
-    # Detecção e exibição do tipo de falta e porcentagem
-    #tipo_falta, porcentagem_falta = detectar_tipo_falta(vrms_final)
-    #label_tipo_falta.config(text=f"Tipo de Falta Identificada: {tipo_falta}")
-    #label_porcentagem_falta.config(text=f"Porcentagem da Linha de Transmissão: {porcentagem_falta:.2f}%")
 
     # Plotagem dos fasores no tempo zero
     if modulo and angulo:  # Verifica se há dados para plotar
         plotar_fasores(modulo, angulo, 0)
-
+    
+    print(f"XXX_____FINALIZADO")
 
 def plot_filter(sinal, canais, coluna, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
         # Plotagem e salvamento do gráfico do Sinal Original e Processado
+        pasta_new = os.path.join(pasta_nome, f"00_SINAIS FILTRADO")
+        os.makedirs(pasta_new, exist_ok=True)
         plt.figure(figsize=(12, 6))
         plt.plot(np.arange(len(sinal)) / original_rate, sinal, label=f'Original - Canal {canais[coluna]}', alpha=0.5)
         plt.plot(time_processado, sinal_processado, label=f'Processado - Canal {canais[coluna]}')
@@ -130,25 +105,48 @@ def plot_filter(sinal, canais, coluna, time_processado, sinal_processado, origin
         plt.xlabel('Tempo (s)')
         plt.ylabel('Valor')
         plt.legend()
-        sinal_fig_name = f"Sinal_Original_e_Filtrado_{timestamp}_{coluna}.png"
+        sinal_fig_name = f"Sinal_Original_e_Filtrado_{coluna}.png"
         print(f"    {sinal_fig_name}")
-        sinal_fig_path = os.path.join(pasta_nome, sinal_fig_name)
+        sinal_fig_path = os.path.join(pasta_new, sinal_fig_name)
         plt.savefig(sinal_fig_path)
         plt.show()  # Exibir o gráfico
         plt.close()
 
-def plot_vrms(sinal, canais, coluna, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
+def plot_vrms(time, sinal, canais, coluna, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
+        
         # Plotagem e salvamento do gráfico do Sinal Original e Processado
+        pasta_new = os.path.join(pasta_nome, f"01_SINAIS VRMS")
+        os.makedirs(pasta_new, exist_ok=True)
         plt.figure(figsize=(12, 6))
-        plt.plot(np.arange(len(sinal)) / original_rate, sinal/1000, label=f'Original - Canal {canais[coluna]}', alpha=0.5)
-        plt.plot(time_processado, sinal_processado, label=f'Processado - Canal {canais[coluna]}')
+        plt.plot(time, sinal, label=f'Original - Canal {canais[coluna]}', alpha=0.5)
+        plt.plot(time_processado, sinal_processado, label=f'VMRS - Canal {canais[coluna]}')
         plt.title('Sinal Original e Processado')
         plt.xlabel('Tempo (s)')
         plt.ylabel('Valor')
         plt.legend()
-        sinal_fig_name = f"Sinal_Original_e_Filtrado_{timestamp}_{coluna}.png"
+        sinal_fig_name = f"Sinal_VRMS_{coluna}.png"
         print(f"    {sinal_fig_name}")
-        sinal_fig_path = os.path.join(pasta_nome, sinal_fig_name)
+        sinal_fig_path = os.path.join(pasta_new, sinal_fig_name)
         plt.savefig(sinal_fig_path)
         plt.show()  # Exibir o gráfico
         plt.close()
+
+def plot_fasor(mod, ang):
+     
+    fig, (ax1, ax2) = plt.subplots(2, 1)
+
+
+    for array in mod:
+        ax1.plot(array)
+    ax1.set_title('modulo')
+    
+    # Plotar os arrays do segundo grupo no segundo eixo
+    for array in ang:
+        ax2.plot(array)
+    ax2.set_title('angulo')
+
+    # Ajustar o layout para evitar sobreposição
+    plt.tight_layout()
+
+    # Mostrar a figura
+    plt.show()

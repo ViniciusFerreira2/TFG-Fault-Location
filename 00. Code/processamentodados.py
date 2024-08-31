@@ -3,6 +3,7 @@ import os
 import numpy as np
 from scipy.signal import butter, filtfilt, resample
 import cmath
+import math
 
 # Nome do arquivo de configuração
 CONFIG_FILE = 'config.json'
@@ -43,93 +44,11 @@ class processamento():
         filtered_signal = filtfilt(b, a, downsampled_signal)
         num_samples_processado = len(filtered_signal)
         time_processado = np.linspace(0, num_samples_processado / target_rate, num_samples_processado)
-        #sampling_rate = 1/time_processado
+        sample_rate = num_samples_processado
+
+        return filtered_signal, time_processado, sample_rate
         
-        return filtered_signal, time_processado
-
-    def calculate_vrms(signal, original_rate):
-        # Conversão da taxa de amostragem de µs para segundos
-        #t = np.arange(0, len(signal)) / original_rate  # Tempo em segundos
-
-        # Frequência angular
-        omega = 2 * np.pi * 60  # 60 Hz
-
-        # Inicializar listas para armazenar os valores de θ, módulo e ângulo
-        theta_list = []
-        modulus_list = []
-        modulus_values = []
-        angle_list = []
-        vrms_values = []
-        time_new = []
-
-        # Inicializar variáveis para o cálculo de VRMS
-        limite = 16666
-        squared_values = []
-        t=0.000001
-        sumReal = 0
-        sumImag = 0
-
-        Xt = []
-        fasores = []
-        #h = Harmonica alvo, no caso é a harmônica fundamental = 1
-        h = 1 
-        intervalo = 1024
-        for p in range(1, (1+intervalo)):
-            Xt.append([np.cos((2 * np.pi * h * (p - 1)) / intervalo), np.sin((2 * np.pi * h * (p - 1)) / intervalo)])
-        Xt = np.array(Xt)
-
-        for j in range(len(signal) - (intervalo-1)):
-            # Janela de dados analisada pela DFT
-            janela = signal[j:j+(intervalo)]  # Deve ser j:j+8 para incluir 8 elementos
-
-            #sumReal = 0  # Reinicializar a cada nova janela
-            #sumImag = 0  # Reinicializar a cada nova janela
-
-            for n in range(intervalo):
-                sumReal += janela[n] * Xt[n, 0]
-                sumImag += janela[n] * Xt[n, 1]
-
-            FasorReal = (2) / (np.sqrt(2) * (intervalo)) * sumReal
-            FasorImag = (-2) / (np.sqrt(2) * (intervalo)) * sumImag
-            num_Complexo = FasorReal + FasorImag * 1j
-
-            modulus_values.append(np.abs(num_Complexo))
-            angle_list.append(np.angle(num_Complexo,True))
-            fasores.append(num_Complexo)
-            time_new.append(j / original_rate)
-        print(fasores)
-        
-        ''' 
-        somatorio = 0
-        for i in range(limite):
-            if i == 0:
-                somatorio = 0
-            else:
-                somatorio += squared_values[i]
-            vrms = np.sqrt(somatorio*60)
-            vrms_values.append(vrms)  # Calcular a raiz quadrada da média
-            modulus_values.append(somatorio)
-            #if i == 16665:
-            #   print("modulo:", vrms)
-            time_new.append(i / original_rate)
-
-        for i in range(limite, len(squared_values)):
-            somatorio -= squared_values[i - limite]
-            somatorio += squared_values[i]
-            vrms_values.append(np.sqrt(somatorio*60))  # Calcular a raiz quadrada da média
-            modulus_values.append(somatorio)
-            time_new.append(i / original_rate)
-        '''
-        # Converter as listas para arrays numpy
-        vrms_array = np.array(fasores)
-        modulus_array = np.array(modulus_values)
-        angle_array = np.array(angle_list)
-        time_new_array = np.array(time_new)
-
-        return vrms_array, time_new_array, modulus_array, angle_array
-        
-
-        '''
+    def vrm_per_phase(signal, time):
         vrms_values = []
         time_new = []
         squared_values = []
@@ -142,45 +61,12 @@ class processamento():
             x2 = signal[i + 1]
             squared_x1 = x1 ** 2
             squared_x2 = x2 ** 2
-            area = (squared_x1 + squared_x2) * 10**(-6) / 2
+            area = (squared_x1 + squared_x2) * (time[i+1]-time[i]) / 2
             squared_values.append(area)
-        limite = 16666
-
-        for i in range(limite):
-            if i == 0:
-                somatorio = 0
-            else:
-                somatorio += squared_values[i]
-            vrms = np.sqrt(somatorio * 60) / 1000
-            vrms_values.append(vrms)
-            time_new.append(i / sampling_rate)
-
-        for i in range(limite, len(squared_values)):
-            somatorio -= squared_values[i - limite]
-            somatorio += squared_values[i]
-            vrms = np.sqrt(somatorio * 60) / 1000
-            vrms_values.append(vrms)
-            time_new.append(i / sampling_rate)
-
-        return vrms_values, time_new
-    '''
-        
-    def vrm_per_phase(signal, time, sampling_rate):
-        vrms_values = []
-        time_new = []
-        squared_values = []
-
-        if len(signal) < 2:
-            raise ValueError("O sinal deve ter pelo menos duas amostras para calcular o RMS entre intervalos.")
-
-        for i in range(len(signal) - 1):
-            x1 = signal[i]
-            x2 = signal[i + 1]
-            squared_x1 = x1 ** 2
-            squared_x2 = x2 ** 2
-            area = (squared_x1 + squared_x2) * 10**(-6) / 2
-            squared_values.append(area)
-        limite = round((1/60)/(1/4800))
+            
+        limite = (1/60)/(time[-1]/len(time))
+ 
+        limite = math.floor(limite)
         #print(limite)
 
         for i in range(limite):
@@ -188,19 +74,92 @@ class processamento():
                 somatorio = 0
             else:
                 somatorio += squared_values[i]
-            vrms = np.sqrt(somatorio * 60) / 1000
+            vrms = np.sqrt(somatorio * 60)
             vrms_values.append(vrms)
-            time_new.append(i / sampling_rate)
+            time_new.append(time[i])
 
         for i in range(limite, len(squared_values)):
             somatorio -= squared_values[i - limite]
             somatorio += squared_values[i]
-            vrms = np.sqrt(somatorio * 60) / 1000
+            vrms = np.sqrt(somatorio * 60)
             vrms_values.append(vrms)
-            time_new.append(i / sampling_rate)
+            time_new.append(time[i])
 
         return vrms_values, time_new
 
+    def fasor(signal, time):
+        # Conversão da taxa de amostragem de µs para segundos
+        #t = np.arange(0, len(signal)) / original_rate  # Tempo em segundos
+
+        # Frequência angular
+        omega = 2 * np.pi * 60  # 60 Hz
+        sample_rate = math.floor((1/60)/(time[-1]/len(time)))
+
+        yk = [] 
+        xt = []
+        mod_values = []
+        ang_values = []
+        ang_ant = 0 
+        vrms_ant = 0
+
+        for i in range(sample_rate):
+            yk.append(signal[i])
+            xt.append([1, math.sin(omega*time[i]),math.cos(omega*time[i]), time[i]])
+
+        for j in range(sample_rate, len(signal)):
+            
+            print("&&&&")
+            print(j)
+            print("&&&&")
+
+            xt_array = np.array(xt)
+            yk_array = np.array(yk)
+
+
+            print("MATRIX XT")
+            print(xt_array)
+
+            print("MATRIX YK")
+            print(yk_array)
+            xt_transpoto = xt_array.T
+            yk_transpoto = yk_array.T
+
+            # print("---------------")
+            # print(xt_array)
+            # print(yk_array)
+            # print(xt_transpoto)
+            # print("---------------")
+            produt1 = np.dot(xt_transpoto, xt_array)
+            if np.linalg.det(produt1) == 0:
+                ang = ang_ant
+                vrms = vrms_ant
+            else:
+                inversa1 = np.linalg.inv(produt1)
+                produt2 = np.dot(inversa1, xt_transpoto)
+                deltas = np.dot(produt2,yk_transpoto)
+
+                value = complex(deltas[1], deltas[2])
+
+                vrms = abs(value)
+                ang = math.degrees(cmath.phase(value))
+
+            vrms_ant = vrms
+            ang_ant = ang
+
+            mod_values.append(vrms)
+            ang_values.append(ang)
+
+            del yk[0] #removendo o antigo
+            del xt[0] #removendo o antigo
+
+            yk.append(signal[j]) # adicionando o novo valor 
+            xt.append([1, math.sin(omega*time[j]),math.cos(omega*time[j]), time[j]])
+
+        signal_modulo = np.array(mod_values)
+        signal_ang = np.array(ang_values)
+
+        return signal_modulo, signal_ang
+    
     def detectar_tipo_falta(vrms_values):
         if len(vrms_values) < 12:
             print("Não há dados suficientes para detectar a falta.")
