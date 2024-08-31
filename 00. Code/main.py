@@ -1,9 +1,9 @@
 from interface import JanelaSelecaoArquivos
-from processamentodados import carregar_parametros
+from processamentodados import processamento
 import tkinter as tk
 
 def main():
-    parametros = carregar_parametros()
+    parametros = processamento.carregar_parametros()
     root = tk.Tk()
     app = JanelaSelecaoArquivos(root, parametros)
     root.mainloop()

@@ -4,7 +4,7 @@ import comtrade
 import json
 import os
 from plot import plotar_sinais
-from processamentodados import salvar_parametros, process_signal, calculate_vrms, detectar_tipo_falta
+from processamentodados import processamento 
 
 class JanelaSelecaoArquivos:
     def __init__(self, root, parametros):
@@ -77,7 +77,7 @@ class JanelaSelecaoArquivos:
         self.parametros['arquivo2'] = self.arquivo2.get()
         self.parametros['freq_amostragem'] = self.freq_amostragem.get()
         self.parametros['freq_corte_max'] = self.freq_corte_max.get()
-        salvar_parametros(self.parametros)
+        processamento.salvar_parametros(self.parametros)
         self.abrir_janela_selecao_colunas()
 
     def abrir_janela_selecao_colunas(self):
@@ -105,9 +105,9 @@ class JanelaSelecaoArquivos:
         if len(colunas_validas) != len(colunas_selecionadas):
             print("Alguns índices selecionados são inválidos e foram removidos.")
         self.parametros['colunas'] = colunas_validas
-        salvar_parametros(self.parametros)
+        processamento.salvar_parametros(self.parametros)
         self.janela_colunas.destroy()
-        self.plotar_sinais()
+        self.initial()
 
-    def plotar_sinais(self):
+    def initial(self):
         plotar_sinais(self.parametros, self.canais, self.label_tipo_falta, self.label_porcentagem_falta)

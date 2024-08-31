@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import comtrade
 from datetime import datetime
-from processamentodados import process_signal, calculate_vrms, detectar_tipo_falta
+from processamentodados import processamento #process_signal, calculate_vrms, detectar_tipo_falta
 
 def plotar_fasores(modulo, angulo, tempo_selecionado):
     """
@@ -40,9 +40,12 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
     rec = comtrade.Comtrade()
     try:
         rec.load(arquivo1, arquivo2)
+        print("001_____ARQUIVOS IMPORTADOS COM SUCESSO")
     except TypeError:
         print("Caminhos não foram definidos corretamente.")
         return
+    
+
     signals = np.array(rec.analog)
     original_rate = 1000000  # Frequência original
     target_rate = freq_amostragem  # Frequência de amostragem alvo
@@ -54,6 +57,7 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
     current_directory = os.path.dirname(os.path.abspath(__file__))  # Diretório atual do código
     pasta_nome = os.path.join(current_directory, f"Graficos_{timestamp}")
     os.makedirs(pasta_nome, exist_ok=True)
+    print(f"002_____CRIAÇÃO DA PASTA: {pasta_nome}")
 
     modulo = []
     angulo = []
@@ -64,51 +68,47 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
         scale_factor = rec.cfg.analog_channels[channel_index].a
         offset = rec.cfg.analog_channels[channel_index].b  
 
-        # Processamento do sinal
-        vrms_values, time_new, mod, ang = calculate_vrms(sinal, target_rate)
-        
-        if len(mod) == 0 or len(ang) == 0:
-            print(f"Erro: Módulo ou ângulo vazios para a coluna {coluna}")
-            continue  # Pula esta coluna se os valores estiverem vazios
-        
 
-        print(ang[16667])
-        print(mod[16667])
-        modulo.append(mod)
-        angulo.append(ang)
-        
-        vrms_final.append(vrms_values)
-        sinal_processado = process_signal(sinal, original_rate, target_rate, cutoff_freq)
-        num_samples_processado = len(sinal_processado)
-        time_processado = np.linspace(0, num_samples_processado / target_rate, num_samples_processado)
+        #FILTRO DOS DADOS
+        print(f"003_____CRIANDO SINAL FILTRADO")
+        sinal_filtrado, time_filtrado = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
+        plot_filter(sinal, canais, coluna, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
 
-        # Plotagem e salvamento do gráfico de Vrms
-        plt.figure(figsize=(12, 6))
-        plt.plot(time_new, mod, label=f'Vrms - Canal {canais[coluna]}')
+
+        sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado,time_filtrado, original_rate)
+
+        #plot_vrms(sinal, canais, coluna, time_vrms, sinal_vrms, original_rate, timestamp, pasta_nome)
+
+
+
+        #CALCULO VRMS e ANGULO
+        # vrms_values, time_new, mod, ang = processamento.calculate_vrms(sinal, target_rate)
+        
+        # if len(mod) == 0 or len(ang) == 0:
+        #     print(f"Erro: Módulo ou ângulo vazios para a coluna {coluna}")
+        #     continue  # Pula esta coluna se os valores estiverem vazios
+        
+        # modulo.append(mod)
+        # angulo.append(ang)
+        
+        # vrms_final.append(vrms_values)
+        # sinal_processado = process_signal(sinal, original_rate, target_rate, cutoff_freq)
+        # num_samples_processado = len(sinal_processado)
+        # time_processado = np.linspace(0, num_samples_processado / target_rate, num_samples_processado)
+
+        # # Plotagem e salvamento do gráfico de Vrms
+        # plt.figure(figsize=(12, 6))
+        # plt.plot(time_new, mod, label=f'Vrms - Canal {canais[coluna]}')
     
-        plt.title('Vrms dos Sinais')
-        plt.xlabel('Tempo (s)')
-        plt.ylabel('Vrms')
-        plt.legend()
-        vrms_fig_name = f"Vrms_dos_Sinais_{timestamp}.png"
-        vrms_fig_path = os.path.join(pasta_nome, vrms_fig_name)
-        plt.savefig(vrms_fig_path)
-        plt.show()  # Exibir o gráfico
-        plt.close()
-
-        # Plotagem e salvamento do gráfico do Sinal Original e Processado
-        plt.figure(figsize=(12, 6))
-        plt.plot(np.arange(len(sinal)) / original_rate, sinal, label=f'Original - Canal {canais[coluna]}', alpha=0.5)
-        plt.plot(time_processado, sinal_processado, label=f'Processado - Canal {canais[coluna]}')
-        plt.title('Sinal Original e Processado')
-        plt.xlabel('Tempo (s)')
-        plt.ylabel('Valor')
-        plt.legend()
-        sinal_fig_name = f"Sinal_Original_e_Processado_{timestamp}.png"
-        sinal_fig_path = os.path.join(pasta_nome, sinal_fig_name)
-        plt.savefig(sinal_fig_path)
-        plt.show()  # Exibir o gráfico
-        plt.close()
+        # plt.title('Vrms dos Sinais')
+        # plt.xlabel('Tempo (s)')
+        # plt.ylabel('Vrms')
+        # plt.legend()
+        # vrms_fig_name = f"Vrms_dos_Sinais_{timestamp}.png"
+        # vrms_fig_path = os.path.join(pasta_nome, vrms_fig_name)
+        # plt.savefig(vrms_fig_path)
+        # plt.show()  # Exibir o gráfico
+        # plt.close()
 
     # Detecção e exibição do tipo de falta e porcentagem
     #tipo_falta, porcentagem_falta = detectar_tipo_falta(vrms_final)
@@ -119,3 +119,35 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
     if modulo and angulo:  # Verifica se há dados para plotar
         plotar_fasores(modulo, angulo, 0)
 
+
+def plot_filter(sinal, canais, coluna, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
+        # Plotagem e salvamento do gráfico do Sinal Original e Processado
+        plt.figure(figsize=(12, 6))
+        plt.plot(np.arange(len(sinal)) / original_rate, sinal, label=f'Original - Canal {canais[coluna]}', alpha=0.5)
+        plt.plot(time_processado, sinal_processado, label=f'Processado - Canal {canais[coluna]}')
+        plt.title('Sinal Original e Processado')
+        plt.xlabel('Tempo (s)')
+        plt.ylabel('Valor')
+        plt.legend()
+        sinal_fig_name = f"Sinal_Original_e_Filtrado_{timestamp}_{coluna}.png"
+        print(f"    {sinal_fig_name}")
+        sinal_fig_path = os.path.join(pasta_nome, sinal_fig_name)
+        plt.savefig(sinal_fig_path)
+        plt.show()  # Exibir o gráfico
+        plt.close()
+
+def plot_vrms(sinal, canais, coluna, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
+        # Plotagem e salvamento do gráfico do Sinal Original e Processado
+        plt.figure(figsize=(12, 6))
+        plt.plot(np.arange(len(sinal)) / original_rate, sinal/1000, label=f'Original - Canal {canais[coluna]}', alpha=0.5)
+        plt.plot(time_processado, sinal_processado, label=f'Processado - Canal {canais[coluna]}')
+        plt.title('Sinal Original e Processado')
+        plt.xlabel('Tempo (s)')
+        plt.ylabel('Valor')
+        plt.legend()
+        sinal_fig_name = f"Sinal_Original_e_Filtrado_{timestamp}_{coluna}.png"
+        print(f"    {sinal_fig_name}")
+        sinal_fig_path = os.path.join(pasta_nome, sinal_fig_name)
+        plt.savefig(sinal_fig_path)
+        plt.show()  # Exibir o gráfico
+        plt.close()
