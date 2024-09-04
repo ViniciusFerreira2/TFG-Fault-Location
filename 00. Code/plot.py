@@ -39,7 +39,7 @@ def plotar_sinais(parametros, canais, label_tipo_falta, label_porcentagem_falta)
     modulo = []
     angulo = []
 
-    for coluna in colunas_selecionadas:
+    for coluna in range(11):#colunas_selecionadas:
         sinal = signals[coluna]
         channel_index = coluna
         scale_factor = rec.cfg.analog_channels[channel_index].a
