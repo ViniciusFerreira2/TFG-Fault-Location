@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, Button, Entry, Listbox, MULTIPLE, Toplevel, OptionMenu
+from tkinter import filedialog, Button, Entry, Listbox, MULTIPLE, ttk
 import comtrade
 import json
 import os
@@ -20,7 +20,9 @@ class JanelaSelecaoArquivos:
 
     def criar_interface(self):
         self.root.title("Selecionar Arquivos COMTRADE")
+        self.root.state('zoomed')  # Maximiza a janela
 
+        # Configura o restante da interface conforme já feito
         label_instrucao = tk.Label(self.root, text="Selecione ou insira manualmente os caminhos dos arquivos COMTRADE")
         label_instrucao.pack(pady=10)
 
@@ -42,6 +44,25 @@ class JanelaSelecaoArquivos:
         button_selecionar2 = tk.Button(frame_arquivo2, text="Selecionar", command=self.selecionar_arquivo2)
         button_selecionar2.grid(row=0, column=2, padx=5)
 
+        # Botão de Carregar Arquivo logo abaixo das entradas
+        button_carregar = tk.Button(self.root, text="Carregar Arquivo", command=self.carregar_colunas)
+        button_carregar.pack(pady=10)
+
+        # Adiciona caixas de texto e seus rótulos com as características da linha
+        frame_caracteristicas = tk.Frame(self.root)
+        frame_caracteristicas.pack(pady=10)
+        tk.Label(frame_caracteristicas, text="Características da Linha").grid(row=0, column=0, columnspan=3, pady=5)
+
+        self.entries_caracteristicas = {}
+
+        for i, (label, unit) in enumerate([("R1", "Ω/km"), ("X1", "Ω/km"), ("R0", "Ω/km"), ("X0", "Ω/km"), ("L", "km")]):
+            tk.Label(frame_caracteristicas, text=f"{label}").grid(row=i+1, column=0, padx=5, sticky="w")
+            entry = tk.Entry(frame_caracteristicas, width=15)
+            entry.grid(row=i+1, column=1, padx=5, sticky="w")
+            tk.Label(frame_caracteristicas, text=unit).grid(row=i+1, column=2, padx=5, sticky="w")
+            self.entries_caracteristicas[label] = entry
+
+        # Caixas de entrada de frequências
         frame_frequencias = tk.Frame(self.root)
         frame_frequencias.pack(pady=10)
         label_freq_amostragem = tk.Label(frame_frequencias, text="Frequência de Amostragem (Hz):")
@@ -54,22 +75,18 @@ class JanelaSelecaoArquivos:
         entry_freq_max = tk.Entry(frame_frequencias, textvariable=self.freq_corte_max, width=15)
         entry_freq_max.grid(row=1, column=1, padx=5, sticky="w")
 
-        # Adicionando as checkboxes
-        self.opcao = tk.IntVar(value=0)
-        self.frame_checkboxes = tk.Frame(self.root)
-        self.frame_checkboxes.pack(padx=10, pady=10, expand=True)
-        self.checkbox1 = tk.Checkbutton(self.root, text="1 Terminal", variable=self.opcao, onvalue=1, offvalue=0, command=self.atualizar_interface)
-        self.checkbox1.pack(padx=10, pady=10, anchor = "center")
-        self.checkbox2 = tk.Checkbutton(self.root, text="2 Terminais", variable=self.opcao, onvalue=2, offvalue=0, command=self.atualizar_interface)
-        self.checkbox2.pack(padx=10, pady=10, anchor = "center")
-        self.frame_checkboxes.pack_propagate(False)
-        
+        # Lista suspensa para número de terminais
+        self.opcao_terminal = tk.StringVar(value="")
+        label_opcao_terminal = tk.Label(self.root, text="Selecione o número de terminais:")
+        label_opcao_terminal.pack(pady=10)
+        self.combo_terminal = ttk.Combobox(self.root, textvariable=self.opcao_terminal, values=["1 Terminal", "2 Terminais"], state="readonly")
+        self.combo_terminal.pack(pady=10)
 
-        # Adicionando as listas suspensas (desabilitadas inicialmente)
+        # Adicionando as listas suspensas (inicia com valor vazio)
         self.frames_listas = []
         self.listas_tensao = []
         self.listas_corrente = []
-        
+
         for i in range(6):
             frame_lista = tk.Frame(self.root)
             self.frames_listas.append(frame_lista)
@@ -77,41 +94,62 @@ class JanelaSelecaoArquivos:
             lista_corrente = tk.StringVar()
             self.listas_tensao.append(lista_tensao)
             self.listas_corrente.append(lista_corrente)
-            tk.Label(frame_lista, text=f"Tensão {i+1}").grid(row=0, column=0)
-            opcao_tensao = tk.OptionMenu(frame_lista, lista_tensao, "")
+            rotulo_tensao = ["øA", "øB", "øC", "øA", "øB", "øC"][i]  # Nomes alternativos
+            rotulo_corrente = ["øA", "øB", "øC", "øA", "øB", "øC"][i]  # Nomes alternativos
+            tk.Label(frame_lista, text=f"Tensão {rotulo_tensao}").grid(row=0, column=0)
+            opcao_tensao = ttk.Combobox(frame_lista, textvariable=lista_tensao, state="readonly")
             opcao_tensao.grid(row=0, column=1, padx=5)
-            tk.Label(frame_lista, text=f"Corrente {i+1}").grid(row=0, column=2)
-            opcao_corrente = tk.OptionMenu(frame_lista, lista_corrente, "")
+            tk.Label(frame_lista, text=f"Corrente {rotulo_corrente}").grid(row=0, column=2)
+            opcao_corrente = ttk.Combobox(frame_lista, textvariable=lista_corrente, state="readonly")
             opcao_corrente.grid(row=0, column=3, padx=5)
             frame_lista.opcao_tensao = opcao_tensao
             frame_lista.opcao_corrente = opcao_corrente
 
-        # Botão de Carregar
-        button_carregar = tk.Button(self.root, text="Carregar Arquivo", command=self.carregar_colunas)
-        button_carregar.pack(pady=10)
+        # Botão Confirmar, inicialmente escondido
+        self.botao_confirmar = tk.Button(self.root, text="Confirmar", command=self.confirmar)
+        self.botao_confirmar.pack(pady=20)
+        self.botao_confirmar.pack_forget()  # Esconde o botão
 
-        # self.label_tipo_falta = tk.Label(self.root, text="Tipo de Falta Identificada:")
-        # self.label_tipo_falta.pack(pady=10)
+        # Configurando para chamar 'atualizar_interface' quando o valor da Combobox mudar
+        self.combo_terminal.bind("<<ComboboxSelected>>", self.atualizar_interface)
 
-        # self.label_porcentagem_falta = tk.Label(self.root, text="Porcentagem da Linha de Transmissão:")
-        # self.label_porcentagem_falta.pack(pady=10)
+    def atualizar_interface(self, *args):
+        opcao = self.opcao_terminal.get()
 
-        botao_confirmar = tk.Button(self.root, text="Confirmar", command=self.confirmar)
-        botao_confirmar.pack(pady=20)
+        # Limpa todos os elementos antes de reconfigurar
+        for frame in self.frames_listas:
+            frame.pack_forget()
+        if hasattr(self, 'label_terminal1'):
+            self.label_terminal1.pack_forget()
+        if hasattr(self, 'label_terminal2'):
+            self.label_terminal2.pack_forget()
+        self.botao_confirmar.pack_forget()
 
-    def atualizar_interface(self):
-        opcao = self.opcao.get()
-        
-        for i, frame in enumerate(self.frames_listas):
-            if opcao == 1 and i < 3:
-                frame.pack(pady=5)
-            elif opcao == 2:
-                frame.pack(pady=5)
-            else:
-                frame.pack_forget()
+        if opcao == "1 Terminal":
+            self.exibir_listas_terminal(3, titulo_terminal1=True)
+        elif opcao == "2 Terminais":
+            self.exibir_listas_terminal(6, titulo_terminal1=True, titulo_terminal2=True)
+
+        # Exibe o botão Confirmar sempre ao final das listas
+        self.botao_confirmar.pack(pady=20)
+
+    def exibir_listas_terminal(self, num_listas, titulo_terminal1=False, titulo_terminal2=False):
+        if titulo_terminal1:
+            if not hasattr(self, 'label_terminal1'):
+                self.label_terminal1 = tk.Label(self.root, text="Terminal 1", font=("Helvetica", 12, "bold"))
+            self.label_terminal1.pack(pady=10)
+
+        for i in range(min(num_listas, 3)):
+            self.frames_listas[i].pack(pady=5)
+
+        if titulo_terminal2:
+            if not hasattr(self, 'label_terminal2'):
+                self.label_terminal2 = tk.Label(self.root, text="Terminal 2", font=("Helvetica", 12, "bold"))
+            self.label_terminal2.pack(pady=10)
+            for i in range(3, num_listas):
+                self.frames_listas[i].pack(pady=5)
 
     def carregar_colunas(self):
-        # Carrega os arquivos e extrai as colunas conforme o código fornecido
         arquivo1 = self.arquivo1.get()
         arquivo2 = self.arquivo2.get()
         freq_amostragem = float(self.freq_amostragem.get())  # Frequência de amostragem fornecida na interface
@@ -129,16 +167,8 @@ class JanelaSelecaoArquivos:
 
     def atualizar_listas_suspensas(self):
         for i in range(6):
-            # Atualizando os menus de Tensão e Corrente
-            menu_tensao = self.frames_listas[i].opcao_tensao["menu"]
-            menu_corrente = self.frames_listas[i].opcao_corrente["menu"]
-            
-            menu_tensao.delete(0, 'end')
-            menu_corrente.delete(0, 'end')
-            
-            for coluna in self.colunas:
-                menu_tensao.add_command(label=coluna, command=tk._setit(self.listas_tensao[i], coluna))
-                menu_corrente.add_command(label=coluna, command=tk._setit(self.listas_corrente[i], coluna))
+            self.frames_listas[i].opcao_tensao['values'] = self.colunas
+            self.frames_listas[i].opcao_corrente['values'] = self.colunas
 
     def selecionar_arquivo1(self):
         arquivo = filedialog.askopenfilename(title="Selecione o primeiro arquivo", filetypes=[("Arquivos CFG", "*.cfg")])
@@ -155,37 +185,27 @@ class JanelaSelecaoArquivos:
         self.parametros['arquivo2'] = self.arquivo2.get()
         self.parametros['freq_amostragem'] = self.freq_amostragem.get()
         self.parametros['freq_corte_max'] = self.freq_corte_max.get()
+
+        # Coleta as colunas selecionadas das listas suspensas
+        colunas_selecionadas = []
+        for i in range(6):
+            coluna_tensao = self.frames_listas[i].opcao_tensao.get()
+            coluna_corrente = self.frames_listas[i].opcao_corrente.get()
+            if coluna_tensao:
+                colunas_selecionadas.append(coluna_tensao)
+            if coluna_corrente:
+                colunas_selecionadas.append(coluna_corrente)
+        
+        # Remove duplicatas e atualiza os parâmetros
+        colunas_selecionadas = list(set(colunas_selecionadas))
+        self.parametros['colunas'] = colunas_selecionadas
         processamento.salvar_parametros(self.parametros)
-        self.abrir_janela_selecao_colunas()
-
-    def abrir_janela_selecao_colunas(self):
-        self.janela_colunas = Toplevel(self.root)
-        self.janela_colunas.title("Selecionar Colunas para Plotagem")
-        label_instrucao = tk.Label(self.janela_colunas, text="Selecione as colunas que deseja plotar:")
-        label_instrucao.pack(pady=10)
-
-        self.listbox_colunas = Listbox(self.janela_colunas, selectmode=MULTIPLE, width=50)
-        self.listbox_colunas.pack(pady=10)
-
-        for i, canal in enumerate(self.colunas):
-            self.listbox_colunas.insert(tk.END, f"{i} - {canal}")
-
-        botao_confirmar_colunas = tk.Button(self.janela_colunas, text="Confirmar", command=self.confirmar_colunas)
-        botao_confirmar_colunas.pack(pady=20)
-
-    def confirmar_colunas(self):
-        colunas_selecionadas = [int(i) for i in self.listbox_colunas.curselection()]
-        max_index = len(self.colunas) - 1
-        colunas_validas = [i for i in colunas_selecionadas if 0 <= i <= max_index]
-        if len(colunas_validas) != len(colunas_selecionadas):
-            print("Alguns índices selecionados são inválidos e foram removidos.")
-        self.parametros['colunas'] = colunas_validas
-        processamento.salvar_parametros(self.parametros)
-        self.janela_colunas.destroy()
+        
+        # Chama a função para processar e plotar os sinais
         self.initial()
 
     def initial(self):
-        plotar_sinais(self.parametros, self.colunas, self.label_tipo_falta, self.label_porcentagem_falta)
+        plotar_sinais(self.parametros, self.colunas)  # Atualize conforme necessário
 
 if __name__ == "__main__":
     parametros = {
