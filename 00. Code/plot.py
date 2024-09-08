@@ -7,12 +7,17 @@ from processamentodados import processamento #process_signal, calculate_vrms, de
 
 def plotar_sinais(parametros, canais):
     vrms_final = []
-    global modulo, angulo  # Variáveis para armazenar os valores de fasores
+    global modulo, angulo
+
+    # Novos parâmetros para verificar se os gráficos serão plotados
+    plotar_filtro = parametros.get('plotar_filtro', False)
+    plotar_rms = parametros.get('plotar_rms', False)
+    plotar_fasores = parametros.get('plotar_fasores', False)
 
     arquivo1 = parametros['arquivo1']
     arquivo2 = parametros['arquivo2']
-    freq_amostragem = float(parametros['freq_amostragem'])  # Frequência de amostragem fornecida na interface
-    freq_corte_max = float(parametros['freq_corte_max'])    # Frequência de corte máxima fornecida na interface
+    freq_amostragem = float(parametros['freq_amostragem'])
+    freq_corte_max = float(parametros['freq_corte_max'])
     colunas_selecionadas = parametros['colunas']
 
     rec = comtrade.Comtrade()
@@ -24,14 +29,13 @@ def plotar_sinais(parametros, canais):
         return
 
     signals = np.array(rec.analog)
-    original_rate = 1000000  # Frequência original
-    target_rate = freq_amostragem  # Frequência de amostragem alvo
-    cutoff_freq = freq_corte_max  # Frequência de corte
+    original_rate = 1000000
+    target_rate = freq_amostragem
+    cutoff_freq = freq_corte_max
 
-    # Cria a pasta com data e hora no mesmo diretório onde o código está sendo executado
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-    current_directory = os.path.dirname(os.path.abspath(__file__))  # Diretório atual do código
+    current_directory = os.path.dirname(os.path.abspath(__file__))
     pasta_nome = os.path.join(current_directory, f"Graficos_{timestamp}")
     os.makedirs(pasta_nome, exist_ok=True)
     print(f"002_____CRIAÇÃO DA PASTA: {pasta_nome}")
@@ -40,29 +44,33 @@ def plotar_sinais(parametros, canais):
     angulo = []
 
     for coluna in colunas_selecionadas:
-        coluna_index = rec.analog_channel_ids.index(coluna)  # Obtém o índice da coluna selecionada
+        coluna_index = rec.analog_channel_ids.index(coluna)
         sinal = signals[coluna_index]
         scale_factor = rec.cfg.analog_channels[coluna_index].a
         offset = rec.cfg.analog_channels[coluna_index].b 
         time = np.linspace(0, len(sinal) / original_rate, len(sinal))
 
-        # FILTRO DOS DADOS
-        print("003_____CRIANDO SINAL FILTRADO")
         sinal_filtrado, time_filtrado, sample_rate = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
-        plot_filter(sinal, canais, coluna_index, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
-        # print(sample_rate)
 
-        print("004_____Realizando o RMS")
-        sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado, time_filtrado)
-        plot_vrms(time_filtrado, sinal_filtrado, canais, coluna_index, time_vrms, sinal_vrms, original_rate, timestamp, pasta_nome)
+        # Plotar o sinal filtrado somente se o checkbox correspondente estiver marcado
+        if plotar_filtro:
+            plot_filter(sinal, canais, coluna_index, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
 
-        print("005_____Estimando o FASOR")
-        signal_modulo, signal_ang = processamento.fasor(sinal_filtrado, time_filtrado)
+        # Plotar o RMS somente se o checkbox correspondente estiver marcado
+        if plotar_rms:
+            sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado, time_filtrado)
+            plot_vrms(time_filtrado, sinal_filtrado, canais, coluna_index, time_vrms, sinal_vrms, original_rate, timestamp, pasta_nome)
 
-        modulo.append(signal_modulo)
-        angulo.append(signal_ang)
+        # Plotar os fasores somente se o checkbox correspondente estiver marcado
+        if plotar_fasores:
+            signal_modulo, signal_ang = processamento.fasor(sinal_filtrado, time_filtrado)
+            modulo.append(signal_modulo)
+            angulo.append(signal_ang)
 
-    plot_fasor(modulo, angulo, pasta_nome)
+    if plotar_fasores and modulo and angulo:
+        plot_fasor(modulo, angulo, pasta_nome)
+        plotar_fasores(modulo, angulo, 18)
+
 
 
     # Plotagem dos fasores no tempo zero

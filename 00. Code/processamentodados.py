@@ -153,6 +153,7 @@ class processamento():
 
         signal_modulo = np.array(mod_values)
         signal_ang = np.array(ang_values)
+        print(signal_ang.shape)
 
         return signal_modulo, signal_ang
     

@@ -105,6 +105,27 @@ class JanelaSelecaoArquivos:
             frame_lista.opcao_tensao = opcao_tensao
             frame_lista.opcao_corrente = opcao_corrente
 
+        # Adicionando Checkboxes
+        self.checkbox_frame = tk.Frame(self.root)
+        self.checkbox_frame.pack_forget()  # Esconde o frame inicialmente
+
+        self.label_checkboxes = tk.Label(self.checkbox_frame, text="Seleção de gráficos:")
+        self.label_checkboxes.grid(row=0, column=0, columnspan=3)
+
+        # Criação dos checkboxes
+        self.plotar_filtro = tk.BooleanVar(value=False)
+        self.plotar_rms = tk.BooleanVar(value=False)
+        self.plotar_fasores = tk.BooleanVar(value=False)
+
+        self.checkbox_filtro = tk.Checkbutton(self.checkbox_frame, text="Sinal pós filtro", variable=self.plotar_filtro)
+        self.checkbox_rms = tk.Checkbutton(self.checkbox_frame, text="RMS", variable=self.plotar_rms)
+        self.checkbox_fasores = tk.Checkbutton(self.checkbox_frame, text="Fasores", variable=self.plotar_fasores)
+
+        # Posiciona os checkboxes
+        self.checkbox_filtro.grid(row=1, column=0, padx=5, pady=5)
+        self.checkbox_rms.grid(row=1, column=1, padx=5, pady=5)
+        self.checkbox_fasores.grid(row=1, column=2, padx=5, pady=5)
+
         # Botão Confirmar, inicialmente escondido
         self.botao_confirmar = tk.Button(self.root, text="Confirmar", command=self.confirmar)
         self.botao_confirmar.pack(pady=20)
@@ -130,8 +151,9 @@ class JanelaSelecaoArquivos:
         elif opcao == "2 Terminais":
             self.exibir_listas_terminal(6, titulo_terminal1=True, titulo_terminal2=True)
 
-        # Exibe o botão Confirmar sempre ao final das listas
+        # Exibe o botão Confirmar e o frame com os checkboxes
         self.botao_confirmar.pack(pady=20)
+        self.checkbox_frame.pack(pady=10)
 
     def exibir_listas_terminal(self, num_listas, titulo_terminal1=False, titulo_terminal2=False):
         if titulo_terminal1:
@@ -195,14 +217,17 @@ class JanelaSelecaoArquivos:
                 colunas_selecionadas.append(coluna_tensao)
             if coluna_corrente:
                 colunas_selecionadas.append(coluna_corrente)
-        
-        # Remove duplicatas e atualiza os parâmetros
-        colunas_selecionadas = list(set(colunas_selecionadas))
+
         self.parametros['colunas'] = colunas_selecionadas
+
+        # Adiciona os estados dos checkboxes aos parâmetros
+        self.parametros['plotar_filtro'] = self.plotar_filtro.get()
+        self.parametros['plotar_rms'] = self.plotar_rms.get()
+        self.parametros['plotar_fasores'] = self.plotar_fasores.get()
+
         processamento.salvar_parametros(self.parametros)
-        
-        # Chama a função para processar e plotar os sinais
         self.initial()
+
 
     def initial(self):
         plotar_sinais(self.parametros, self.colunas)  # Atualize conforme necessário
