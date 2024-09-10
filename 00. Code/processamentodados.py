@@ -86,16 +86,12 @@ class processamento():
             time_new.append(time[i])
 
         return vrms_values, time_new
-
+    
     def fasor(signal, time):
-        # Conversão da taxa de amostragem de µs para segundos
-        #t = np.arange(0, len(signal)) / original_rate  # Tempo em segundos
-
         # Frequência angular
         omega = 2 * np.pi * 60  # 60 Hz
         sample_rate = math.floor((1/60)/(time[-1]/len(time)))
 
-        #print (sample_rate)
         yk = [] 
         xt = []
         mod_values = []
@@ -103,26 +99,21 @@ class processamento():
         ang_ant = 0 
         vrms_ant = 0
 
+        # Pré-preenchimento para as primeiras amostras
         for i in range(sample_rate):
             yk.append(signal[i])
-            xt.append([1, math.sin(omega*time[i]),math.cos(omega*time[i]), time[i]])
+            xt.append([1, math.sin(omega*time[i]), math.cos(omega*time[i]), time[i]])
             mod_values.append(0)
             ang_values.append(0)
 
+        # Processamento das amostras restantes
         for j in range(sample_rate, len(signal)):
-
-
             xt_array = np.array(xt)
             yk_array = np.array(yk)
 
             xt_transpoto = xt_array.T
             yk_transpoto = yk_array.T
 
-            # print("---------------")
-            # print(xt_array)
-            # print(yk_array)
-            # print(xt_transpoto)
-            # print("---------------")
             produt1 = np.dot(xt_transpoto, xt_array)
             if np.linalg.det(produt1) == 0:
                 ang = ang_ant
@@ -130,7 +121,7 @@ class processamento():
             else:
                 inversa1 = np.linalg.inv(produt1)
                 produt2 = np.dot(inversa1, xt_transpoto)
-                deltas = np.dot(produt2,yk_transpoto)
+                deltas = np.dot(produt2, yk_transpoto)
 
                 value = complex(deltas[1], deltas[2])
 
@@ -143,20 +134,20 @@ class processamento():
             mod_values.append(vrms)
             ang_values.append(ang)
             
-            
-            del yk[0] #removendo o antigo
-            del xt[0] #removendo o antigo
+            # Atualiza as listas de yk e xt
+            del yk[0]  # Remove a primeira amostra
+            del xt[0]  # Remove a primeira amostra
 
-            yk.append(signal[j]) # adicionando o novo valor 
-            xt.append([1, math.sin(omega*time[j]),math.cos(omega*time[j]), time[j]])
+            yk.append(signal[j])  # Adiciona a nova amostra
+            xt.append([1, math.sin(omega*time[j]), math.cos(omega*time[j]), time[j]])
 
-
+        # Conversão para numpy array
         signal_modulo = np.array(mod_values)
         signal_ang = np.array(ang_values)
-        print(signal_ang.shape)
-
+        #signal_ang_mtz = signal_ang.reshape(960,1)
         return signal_modulo, signal_ang
-    
+        
+
     def detectar_tipo_falta(vrms_values):
         if len(vrms_values) < 12:
             print("Não há dados suficientes para detectar a falta.")

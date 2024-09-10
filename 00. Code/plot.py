@@ -66,6 +66,15 @@ def plotar_sinais(parametros, canais):
             signal_modulo, signal_ang = processamento.fasor(sinal_filtrado, time_filtrado)
             modulo.append(signal_modulo)
             angulo.append(signal_ang)
+    #print(angulo[1])
+    angulo0 = angulo[0]
+    angulo1 = angulo[1]
+    angulo[0] = angulo[0] - angulo[0]
+    angulo[1] = angulo[1] - angulo[1]
+    angulo[2] = angulo[2] - angulo0
+    angulo[3] = angulo[3] - angulo1
+    angulo[4] = angulo[4] - angulo0
+    angulo[5] = angulo[5] - angulo1
 
     if plotar_fasores and modulo and angulo:
         plot_fasor(modulo, angulo, pasta_nome)
@@ -127,18 +136,21 @@ def plot_fasor(mod, ang, pasta_nome):
 
     fig, (ax1, ax2) = plt.subplots(2, 1)
 
+    # Plotar os arrays do primeiro grupo (mod) com legendas
+    for idx, array in enumerate(mod):
+        ax1.plot(array, label=f'Módulo {idx+1}')  # Adiciona uma legenda para cada array
+    ax1.set_title('Módulo')
+    ax1.legend()  # Exibir a legenda no gráfico de módulo
 
-    for array in mod:
-        ax1.plot(array)
-    ax1.set_title('modulo')
-
-    # Plotar os arrays do segundo grupo no segundo eixo
-    for array in ang:
-        ax2.plot(array)
-    ax2.set_title('angulo')
+    # Plotar os arrays do segundo grupo (ang) com legendas
+    for idx, array in enumerate(ang):
+        ax2.plot(array, label=f'Ângulo {idx+1}')  # Adiciona uma legenda para cada array
+    ax2.set_title('Ângulo')
+    ax2.legend()  # Exibir a legenda no gráfico de ângulo
 
     sinal_fig_name = f"Sinal_SINAL E ANGULO.png"
     print(f"    {sinal_fig_name}")
+
     # Ajustar o layout para evitar sobreposição
     plt.tight_layout()
 
