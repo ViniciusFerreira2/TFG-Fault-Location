@@ -4,6 +4,7 @@ import numpy as np
 from scipy.signal import butter, filtfilt, resample
 import cmath
 import math
+import matplotlib.pyplot as plt
 
 # Nome do arquivo de configuração
 CONFIG_FILE = 'config.json'
@@ -96,6 +97,8 @@ class processamento():
         xt = []
         mod_values = []
         ang_values = []
+        R_values = []
+        I_values = []
         ang_ant = 0 
         vrms_ant = 0
 
@@ -144,9 +147,38 @@ class processamento():
         # Conversão para numpy array
         signal_modulo = np.array(mod_values)
         signal_ang = np.array(ang_values)
+        # Parte real e imaginária
+        real_values = signal_modulo * np.cos(signal_ang)
+        imag_values = signal_modulo * np.sin(signal_ang)
+
+        # Sinal complexo (opcional, se quiser juntar as partes real e imaginária em um array complexo)
+        sinal_complexo = real_values + 1j * imag_values
+
         #signal_ang_mtz = signal_ang.reshape(960,1)
-        return signal_modulo, signal_ang
+        return signal_modulo, signal_ang, sinal_complexo
         
+    
+
+    # def plot_XR(sinal_complexo):
+    #     # Separar a parte real e imaginária do sinal complexo
+    #     parte_real = np.real(sinal_complexo)
+    #     parte_imaginaria = np.imag(sinal_complexo)
+
+    #     # Plotar o gráfico
+    #     plt.figure(figsize=(8, 6))
+    #     plt.plot(parte_real, parte_imaginaria, 'bo-', label='Sinal Complexo')
+        
+    #     # Títulos e labels
+    #     plt.title('Gráfico da Parte Real vs Parte Imaginária do Sinal')
+    #     plt.xlabel('Parte Real')
+    #     plt.ylabel('Parte Imaginária')
+        
+    #     # Adicionar grade e legenda
+    #     plt.grid(True)
+    #     plt.legend()
+
+    #     # Mostrar o gráfico
+    #     plt.show()
 
     def detectar_tipo_falta(vrms_values):
         if len(vrms_values) < 12:

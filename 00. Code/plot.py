@@ -42,6 +42,7 @@ def plotar_sinais(parametros, canais):
 
     modulo = []
     angulo = []
+    complexo = []
 
     for coluna in colunas_selecionadas:
         coluna_index = rec.analog_channel_ids.index(coluna)
@@ -63,22 +64,40 @@ def plotar_sinais(parametros, canais):
 
         # Plotar os fasores somente se o checkbox correspondente estiver marcado
         if plotar_fasores:
-            signal_modulo, signal_ang = processamento.fasor(sinal_filtrado, time_filtrado)
+            signal_modulo, signal_ang, signal_complexo = processamento.fasor(sinal_filtrado, time_filtrado)
             modulo.append(signal_modulo)
             angulo.append(signal_ang)
-    #print(angulo[1])
+            complexo.append(signal_complexo)
+            plot_XR(modulo, angulo, complexo)
+
+    # print("ANGULO",angulo[5][225:295])
+    # for j in range(6):  
+    #     for i in range(960):  
+    #         angulo[j][i] = ajustar_angulo(angulo[j][i])
+
     angulo0 = angulo[0]
-    angulo1 = angulo[1]
-    angulo[0] = angulo[0] - angulo[0]
-    angulo[1] = angulo[1] - angulo[1]
-    angulo[2] = angulo[2] - angulo0
-    angulo[3] = angulo[3] - angulo1
-    angulo[4] = angulo[4] - angulo0
-    angulo[5] = angulo[5] - angulo1
+
+    for i in range(960):
+        #angulo[0][i] = angulo[0][i] - angulo0[i]  
+        # Ajuste das demais fases com relação à Fase A
+        angulo[1][i] = angulo[1][i] - angulo[0][i]
+        angulo[2][i] = angulo[2][i] - angulo[0][i]  
+        angulo[3][i] = angulo[3][i] - angulo[0][i]  
+        angulo[4][i] = angulo[4][i] - angulo[0][i]  
+        angulo[5][i] = angulo[5][i] - angulo[0][i]
+        angulo[0][i] = angulo[0][i] - angulo[0][i]  
+
+   # plot_fasor(modulo, [angulo[2], angulo[5]], pasta_nome)
+
+# correção para valores que ultrapassam 180° ou -180°
+    for j in range(6):  
+        for i in range(960):  
+            angulo[j][i] = ajustar_angulo(angulo[j][i])
 
     if plotar_fasores and modulo and angulo:
-        plot_fasor(modulo, angulo, pasta_nome)
-        plotar_fasores(modulo, angulo, 18)
+        plot_fasor([angulo[0], angulo[2], angulo[4]], [angulo[1], angulo[3], angulo[5]], pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
+        #plot_fasor(, angulo, pasta_nome)
+        #plotar_fasores(modulo, angulo, 18)
 
 
 
@@ -87,6 +106,15 @@ def plotar_sinais(parametros, canais):
         plotar_fasores(modulo, angulo, 18)
     
     print(f"XXX_____FINALIZADO")
+
+def ajustar_angulo(angulo):
+    limiteang = 190
+    if angulo > limiteang:
+        angulo = -180 + (angulo - 180)
+    elif angulo < -limiteang:
+        angulo = 180 + (angulo + 180)
+    return angulo
+
 
 def plot_filter(sinal, canais, coluna_index, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
 
@@ -184,4 +212,33 @@ def plotar_fasores(modulo, angulo, tempo_selecionado):
 
     ax.set_ylim(0, max([max(np.abs(m)) for m in modulo]))
     plt.title("Gráfico de Fasores")
+    plt.show()
+
+def plot_XR(modulo, angulo, sinal_complexo):
+   # Separar a parte real e imaginária do sinal complexo
+    parte_real = np.real(sinal_complexo)
+    parte_imaginaria = np.imag(sinal_complexo)
+
+    # Criar o gráfico
+    plt.figure(figsize=(8, 6))
+    
+    # Plotar pontos menores com scatter
+    plt.scatter(parte_real, parte_imaginaria, s=20, c='b', label='Sinal Complexo')  # 's' é o tamanho dos pontos
+    
+    # Adicionar setas para indicar a ordem dos pontos
+    for i in range(len(parte_real) - 1):
+        plt.quiver(parte_real[i], parte_imaginaria[i], 
+                   parte_real[i+1] - parte_real[i], parte_imaginaria[i+1] - parte_imaginaria[i],
+                   angles='xy', scale_units='xy', scale=1, color='r', width=0.002, headwidth=4)
+    
+    # Títulos e labels
+    plt.title('Gráfico da Parte Real vs Parte Imaginária do Sinal')
+    plt.xlabel('Parte Real')
+    plt.ylabel('Parte Imaginária')
+
+    # Adicionar grid e legenda
+    plt.grid(True)
+    #plt.legend()
+
+    # Mostrar o gráfico
     plt.show()
