@@ -97,8 +97,6 @@ class processamento():
         xt = []
         mod_values = []
         ang_values = []
-        R_values = []
-        I_values = []
         ang_ant = 0 
         vrms_ant = 0
 
@@ -156,30 +154,55 @@ class processamento():
 
         #signal_ang_mtz = signal_ang.reshape(960,1)
         return signal_modulo, signal_ang, sinal_complexo
-        
     
+    def ajustar_angulo(angulo):
+        limiteang = 180
+        if angulo > limiteang:
+            angulo = -180 + (angulo - 180)
+        elif angulo < -limiteang:
+            angulo = 180 + (angulo + 180)
+        return angulo
 
-    # def plot_XR(sinal_complexo):
-    #     # Separar a parte real e imaginária do sinal complexo
-    #     parte_real = np.real(sinal_complexo)
-    #     parte_imaginaria = np.imag(sinal_complexo)
+    def calculo_impedancia(modulo, angulo):
+        Zmod = [[0] * 960 for _ in range(3)]  # Inicializa uma lista 3x960
+        Zang = [[0] * 960 for _ in range(3)]  # Inicializa uma lista 3x960
 
-    #     # Plotar o gráfico
-    #     plt.figure(figsize=(8, 6))
-    #     plt.plot(parte_real, parte_imaginaria, 'bo-', label='Sinal Complexo')
+        for i in range(960):
+            #angulo[0][i] = angulo[0][i] - angulo0[i]  
+            # Ajuste das demais fases com relação à Fase A
+            angulo[1][i] = angulo[1][i] - angulo[0][i]
+            angulo[2][i] = angulo[2][i] - angulo[0][i]  
+            angulo[3][i] = angulo[3][i] - angulo[0][i]  
+            angulo[4][i] = angulo[4][i] - angulo[0][i]  
+            angulo[5][i] = angulo[5][i] - angulo[0][i]
+            angulo[0][i] = angulo[0][i] - angulo[0][i]  
+
+        #correção para valores que ultrapassam 180° ou -180°
+        for j in range(6):  
+            for i in range(960):  
+                angulo[j][i] = processamento.ajustar_angulo(angulo[j][i])
+
+        for i in range(960):
+            #Calculo dos modulos e angulos das impedancias
+            Zmod[0][i] = modulo[0][i] / modulo[3][i]
+            Zmod[1][i] = modulo[1][i] / modulo[4][i]
+            Zmod[2][i] = modulo[2][i] / modulo[5][i]
+
+            Zang[0][i] = angulo[0][i] - angulo[3][i]
+            Zang[1][i] = angulo[1][i] - angulo[4][i]
+            Zang[2][i] = angulo[2][i] - angulo[5][i]
         
-    #     # Títulos e labels
-    #     plt.title('Gráfico da Parte Real vs Parte Imaginária do Sinal')
-    #     plt.xlabel('Parte Real')
-    #     plt.ylabel('Parte Imaginária')
+        for j in range(3):
+            for i in range(960):
+                Zang[j][i] = processamento.ajustar_angulo(Zang[j][i])
         
-    #     # Adicionar grade e legenda
-    #     plt.grid(True)
-    #     plt.legend()
+        Zmodulo = Zmod * np.cos(Zang)
+        print("TAMANHO", len(Zmodulo))
+        Zangulo = Zmod * np.sin(Zang)
 
-    #     # Mostrar o gráfico
-    #     plt.show()
-
+        complexo = Zmodulo + 1j*Zangulo
+        return complexo
+    
     def detectar_tipo_falta(vrms_values):
         if len(vrms_values) < 12:
             print("Não há dados suficientes para detectar a falta.")

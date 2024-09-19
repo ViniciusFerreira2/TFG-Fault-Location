@@ -68,53 +68,21 @@ def plotar_sinais(parametros, canais):
             modulo.append(signal_modulo)
             angulo.append(signal_ang)
             complexo.append(signal_complexo)
-            plot_XR(modulo, angulo, complexo)
+            #plot_XR(modulo, angulo, complexo)
 
-    # print("ANGULO",angulo[5][225:295])
-    # for j in range(6):  
-    #     for i in range(960):  
-    #         angulo[j][i] = ajustar_angulo(angulo[j][i])
-
-    angulo0 = angulo[0]
-
-    for i in range(960):
-        #angulo[0][i] = angulo[0][i] - angulo0[i]  
-        # Ajuste das demais fases com relação à Fase A
-        angulo[1][i] = angulo[1][i] - angulo[0][i]
-        angulo[2][i] = angulo[2][i] - angulo[0][i]  
-        angulo[3][i] = angulo[3][i] - angulo[0][i]  
-        angulo[4][i] = angulo[4][i] - angulo[0][i]  
-        angulo[5][i] = angulo[5][i] - angulo[0][i]
-        angulo[0][i] = angulo[0][i] - angulo[0][i]  
-
-   # plot_fasor(modulo, [angulo[2], angulo[5]], pasta_nome)
-
-# correção para valores que ultrapassam 180° ou -180°
-    for j in range(6):  
-        for i in range(960):  
-            angulo[j][i] = ajustar_angulo(angulo[j][i])
-
+    mod_ang_complexo = processamento.calculo_impedancia(modulo, angulo)
+    plot_XR(mod_ang_complexo)
+    
     if plotar_fasores and modulo and angulo:
         plot_fasor([angulo[0], angulo[2], angulo[4]], [angulo[1], angulo[3], angulo[5]], pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
         #plot_fasor(, angulo, pasta_nome)
         #plotar_fasores(modulo, angulo, 18)
-
-
-
+        
     # Plotagem dos fasores no tempo zero
     if modulo and angulo:  # Verifica se há dados para plotar
         plotar_fasores(modulo, angulo, 18)
-    
+
     print(f"XXX_____FINALIZADO")
-
-def ajustar_angulo(angulo):
-    limiteang = 190
-    if angulo > limiteang:
-        angulo = -180 + (angulo - 180)
-    elif angulo < -limiteang:
-        angulo = 180 + (angulo + 180)
-    return angulo
-
 
 def plot_filter(sinal, canais, coluna_index, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
 
@@ -214,31 +182,41 @@ def plotar_fasores(modulo, angulo, tempo_selecionado):
     plt.title("Gráfico de Fasores")
     plt.show()
 
-def plot_XR(modulo, angulo, sinal_complexo):
-   # Separar a parte real e imaginária do sinal complexo
-    parte_real = np.real(sinal_complexo)
-    parte_imaginaria = np.imag(sinal_complexo)
+def plot_XR(complexo):
+    """
+    Função para plotar os dados dos fasores (parte real no eixo X e parte imaginária no eixo Y),
+    destacando o início, meio e fim das ligações.
+    """
+    # Configurar o tamanho da figura
+    plt.figure(figsize=(10, 6))
 
-    # Criar o gráfico
-    plt.figure(figsize=(8, 6))
-    
-    # Plotar pontos menores com scatter
-    plt.scatter(parte_real, parte_imaginaria, s=20, c='b', label='Sinal Complexo')  # 's' é o tamanho dos pontos
-    
-    # Adicionar setas para indicar a ordem dos pontos
-    for i in range(len(parte_real) - 1):
-        plt.quiver(parte_real[i], parte_imaginaria[i], 
-                   parte_real[i+1] - parte_real[i], parte_imaginaria[i+1] - parte_imaginaria[i],
-                   angles='xy', scale_units='xy', scale=1, color='r', width=0.002, headwidth=4)
-    
-    # Títulos e labels
-    plt.title('Gráfico da Parte Real vs Parte Imaginária do Sinal')
-    plt.xlabel('Parte Real')
-    plt.ylabel('Parte Imaginária')
+    # Para cada conjunto de dados (coluna) no complexo
+    for i, comp in enumerate(complexo):
+        # Extrair parte real (eixo X) e parte imaginária (eixo Y)
+        real_part = np.real(comp)
+        imag_part = np.imag(comp)
+
+        # Determinar índices de início, meio e fim
+        inicio = 0
+        meio = len(real_part) // 2
+        fim = len(real_part) - 1
+
+        # Plotar a linha conectando todos os pontos
+        plt.plot(real_part, imag_part, linestyle='-', label=f'Fasor {i+1}')
+
+        # # Destacar o início (círculo verde), meio (quadrado azul) e fim (triângulo vermelho)
+        # plt.plot(real_part[inicio], imag_part[inicio], 'go', label=f'Início {i+1}')  # Círculo verde
+        # plt.plot(real_part[meio], imag_part[meio], 'bs', label=f'Meio {i+1}')  # Quadrado azul
+        # plt.plot(real_part[fim], imag_part[fim], 'r^', label=f'Fim {i+1}')  # Triângulo vermelho
+
+    # Configurar títulos e rótulos dos eixos
+    plt.title("Gráfico de Fasores: Parte Real (X) vs Parte Imaginária (Y)")
+    plt.xlabel("Parte Real")
+    plt.ylabel("Parte Imaginária")
 
     # Adicionar grid e legenda
     plt.grid(True)
-    #plt.legend()
+    plt.legend()
 
-    # Mostrar o gráfico
+    # Exibir o gráfico
     plt.show()
