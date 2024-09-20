@@ -19,6 +19,7 @@ def plotar_sinais(parametros, canais):
     freq_amostragem = float(parametros['freq_amostragem'])
     freq_corte_max = float(parametros['freq_corte_max'])
     colunas_selecionadas = parametros['colunas']
+    print("COLUNAS", colunas_selecionadas)
 
     rec = comtrade.Comtrade()
     try:
