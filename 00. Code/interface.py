@@ -3,7 +3,6 @@ from tkinter import filedialog, Button, Entry, Listbox, MULTIPLE, ttk
 import comtrade
 import json
 import os
-from plot import plotar_sinais
 from processamentodados import processamento
 
 class JanelaSelecaoArquivos:
@@ -225,21 +224,25 @@ class JanelaSelecaoArquivos:
         self.parametros['plotar_rms'] = self.plotar_rms.get()
         self.parametros['plotar_fasores'] = self.plotar_fasores.get()
 
+        
+
         processamento.salvar_parametros(self.parametros)
         self.initial()
 
 
     def initial(self):
-        plotar_sinais(self.parametros, self.colunas)  # Atualize conforme necessário
+        processamento.process(self, self.parametros, self.colunas)
 
-if __name__ == "__main__":
-    parametros = {
-        'arquivo1': '',
-        'arquivo2': '',
-        'freq_amostragem': 0.0,
-        'freq_corte_max': 0.0
-    }
 
-    root = tk.Tk()
-    app = JanelaSelecaoArquivos(root, parametros)
-    root.mainloop()
+
+# if __name__ == "__main__":
+#     parametros = {
+#         'arquivo1': '',
+#         'arquivo2': '',
+#         'freq_amostragem': 0.0,
+#         'freq_corte_max': 0.0
+#     }
+
+#     root = tk.Tk()
+#     app = JanelaSelecaoArquivos(root, parametros)
+#     root.mainloop()

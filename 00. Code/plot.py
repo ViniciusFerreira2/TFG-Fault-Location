@@ -3,87 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import comtrade
 from datetime import datetime
-from processamentodados import processamento #process_signal, calculate_vrms, detectar_tipo_falta
 
-def plotar_sinais(parametros, canais):
-    vrms_final = []
-    global modulo, angulo
-
-    # Novos parâmetros para verificar se os gráficos serão plotados
-    plotar_filtro = parametros.get('plotar_filtro', False)
-    plotar_rms = parametros.get('plotar_rms', False)
-    plotar_fasores = parametros.get('plotar_fasores', False)
-
-    arquivo1 = parametros['arquivo1']
-    arquivo2 = parametros['arquivo2']
-    freq_amostragem = float(parametros['freq_amostragem'])
-    freq_corte_max = float(parametros['freq_corte_max'])
-    colunas_selecionadas = parametros['colunas']
-    print("COLUNAS", colunas_selecionadas)
-
-    rec = comtrade.Comtrade()
-    try:
-        rec.load(arquivo1, arquivo2)
-        print("001_____ARQUIVOS IMPORTADOS COM SUCESSO")
-    except TypeError:
-        print("Caminhos não foram definidos corretamente.")
-        return
-
-    signals = np.array(rec.analog)
-    original_rate = 1000000
-    target_rate = freq_amostragem
-    cutoff_freq = freq_corte_max
-
-    now = datetime.now()
-    timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-    current_directory = os.path.dirname(os.path.abspath(__file__))
-    pasta_nome = os.path.join(current_directory, f"Graficos_{timestamp}")
-    os.makedirs(pasta_nome, exist_ok=True)
-    print(f"002_____CRIAÇÃO DA PASTA: {pasta_nome}")
-
-    modulo = []
-    angulo = []
-    complexo = []
-
-    for coluna in colunas_selecionadas:
-        coluna_index = rec.analog_channel_ids.index(coluna)
-        sinal = signals[coluna_index]
-        scale_factor = rec.cfg.analog_channels[coluna_index].a
-        offset = rec.cfg.analog_channels[coluna_index].b 
-        time = np.linspace(0, len(sinal) / original_rate, len(sinal))
-
-        sinal_filtrado, time_filtrado, sample_rate = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
-
-        # Plotar o sinal filtrado somente se o checkbox correspondente estiver marcado
-        if plotar_filtro:
-            plot_filter(sinal, canais, coluna_index, time_filtrado, sinal_filtrado, original_rate, timestamp, pasta_nome)
-
-        # Plotar o RMS somente se o checkbox correspondente estiver marcado
-        if plotar_rms:
-            sinal_vrms, time_vrms = processamento.vrm_per_phase(sinal_filtrado, time_filtrado)
-            plot_vrms(time_filtrado, sinal_filtrado, canais, coluna_index, time_vrms, sinal_vrms, original_rate, timestamp, pasta_nome)
-
-        # Plotar os fasores somente se o checkbox correspondente estiver marcado
-        if plotar_fasores:
-            signal_modulo, signal_ang, signal_complexo = processamento.fasor(sinal_filtrado, time_filtrado)
-            modulo.append(signal_modulo)
-            angulo.append(signal_ang)
-            complexo.append(signal_complexo)
-            #plot_XR(modulo, angulo, complexo)
-
-    mod_ang_complexo = processamento.calculo_impedancia(modulo, angulo)
-    plot_XR(mod_ang_complexo)
-    
-    if plotar_fasores and modulo and angulo:
-        plot_fasor([angulo[0], angulo[2], angulo[4]], [angulo[1], angulo[3], angulo[5]], pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
-        #plot_fasor(, angulo, pasta_nome)
-        #plotar_fasores(modulo, angulo, 18)
-        
-    # Plotagem dos fasores no tempo zero
-    if modulo and angulo:  # Verifica se há dados para plotar
-        plotar_fasores(modulo, angulo, 18)
-
-    print(f"XXX_____FINALIZADO")
 
 def plot_filter(sinal, canais, coluna_index, time_processado, sinal_processado, original_rate, timestamp, pasta_nome):
 
@@ -157,7 +77,7 @@ def plot_fasor(mod, ang, pasta_nome):
     # Mostrar a figura
     plt.show()
 
-def plotar_fasores(modulo, angulo, tempo_selecionado):
+def plotar_polarformat(modulo, angulo, tempo_selecionado):
     """
     Plota um gráfico de fasores para os módulos e ângulos fornecidos em um tempo específico.
     """
@@ -192,15 +112,11 @@ def plot_XR(complexo):
     plt.figure(figsize=(10, 6))
 
     # Para cada conjunto de dados (coluna) no complexo
-    for i, comp in enumerate(complexo):
+    for i in range(0, len(complexo)):
         # Extrair parte real (eixo X) e parte imaginária (eixo Y)
-        real_part = np.real(comp)
-        imag_part = np.imag(comp)
+        real_part = np.real(complexo[i])
+        imag_part = np.imag(complexo[i])
 
-        # Determinar índices de início, meio e fim
-        inicio = 0
-        meio = len(real_part) // 2
-        fim = len(real_part) - 1
 
         # Plotar a linha conectando todos os pontos
         plt.plot(real_part, imag_part, linestyle='-', label=f'Fasor {i+1}')

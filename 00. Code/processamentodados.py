@@ -4,12 +4,173 @@ import numpy as np
 from scipy.signal import butter, filtfilt, resample
 import cmath
 import math
+import comtrade
+from plot import*
+from datetime import datetime
 import matplotlib.pyplot as plt
 
 # Nome do arquivo de configuração
 CONFIG_FILE = 'config.json'
 
 class processamento():
+    def process(self, parametros, canais):
+        processamento.init_process(self, parametros, canais)
+        print("003_____ REALIZANDO FILTRO")
+        processamento.general_filter(self, parametros, canais)
+        print("004_____ REALIZANDO RMS")
+        processamento.general_rms(self, parametros, canais)
+        print("004_____ REALIZANDO FASOR")
+        processamento.general_fasor(self, parametros, canais)
+        print("005_____ REALIZANDO IMPENDANCIA")
+        processamento.general_impendace(self, parametros, canais)
+        print(f"XXX_____FINALIZADO")
+
+    def init_process(self, parametros, canais):
+        #global modulo, angulo
+        vrms_final = []
+        
+        arquivo1 = parametros['arquivo1']
+        arquivo2 = parametros['arquivo2']
+        freq_amostragem = float(parametros['freq_amostragem'])
+        freq_corte_max = float(parametros['freq_corte_max'])
+        colunas_selecionadas = parametros['colunas']
+        print("COLUNAS", colunas_selecionadas)
+        
+
+        self.rec = comtrade.Comtrade()
+        try:
+            self.rec.load(arquivo1, arquivo2)
+            print("001_____ARQUIVOS IMPORTADOS COM SUCESSO")
+        except TypeError:
+            print("Caminhos não foram definidos corretamente.")
+            return
+
+        signals = np.array(self.rec.analog)
+        original_rate = 1000000
+        self.original_rate = original_rate
+        target_rate = freq_amostragem
+        cutoff_freq = freq_corte_max
+
+        now = datetime.now()
+        self.timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        self.pasta_nome = os.path.join(current_directory, f"Graficos_{self.timestamp}")
+        os.makedirs(self.pasta_nome, exist_ok=True)
+        print(f"002_____CRIAÇÃO DA PASTA: {self.pasta_nome}")
+
+    def general_filter(self, parametros, canais):
+        freq_amostragem = float(parametros['freq_amostragem'])
+        freq_corte_max = float(parametros['freq_corte_max'])
+        colunas_selecionadas = parametros['colunas']
+        signals = np.array(self.rec.analog)
+        original_rate = self.original_rate
+        target_rate = freq_amostragem
+        cutoff_freq = freq_corte_max
+        plotar_filtro = parametros.get('plotar_filtro', False)
+        
+        self.sinal_filtrado = []
+        self.time_filtrado = []
+        self.sample_rate = []
+        index = 0
+
+
+        for coluna in colunas_selecionadas:
+            
+            coluna_index = self.rec.analog_channel_ids.index(coluna)
+            sinal = signals[coluna_index]
+            scale_factor = self.rec.cfg.analog_channels[coluna_index].a
+            offset = self.rec.cfg.analog_channels[coluna_index].b 
+            time = np.linspace(0, len(sinal) / original_rate, len(sinal))
+
+            sinal_filtrado, time_filtrado, sample_rate = processamento.filter_signal(sinal, original_rate, target_rate, cutoff_freq)
+            self.sinal_filtrado.append(sinal_filtrado)
+            self.time_filtrado.append(time_filtrado)
+            self.sample_rate.append(sample_rate)
+            # Plotar o sinal filtrado somente se o checkbox correspondente estiver marcado
+            if plotar_filtro:
+                plot_filter(sinal, canais, coluna_index, self.time_filtrado[index], self.sinal_filtrado[index], original_rate, self.timestamp, self.pasta_nome)
+            index = index + 1
+
+    def general_rms(self, parametros, canais):
+        freq_amostragem = float(parametros['freq_amostragem'])
+        freq_corte_max = float(parametros['freq_corte_max'])
+        colunas_selecionadas = parametros['colunas']
+        signals = np.array(self.rec.analog)
+        original_rate = self.original_rate
+        target_rate = freq_amostragem
+        cutoff_freq = freq_corte_max
+        plotar_filtro = parametros.get('plotar_filtro', False)
+        plotar_rms = parametros.get('plotar_rms', False)
+
+        self.sinal_vrms = []
+        self.time_vrms = []
+        index = 0
+
+        
+
+        for coluna in colunas_selecionadas:
+            coluna_index = self.rec.analog_channel_ids.index(coluna)
+            sinal = signals[coluna_index]
+            scale_factor = self.rec.cfg.analog_channels[coluna_index].a
+            offset = self.rec.cfg.analog_channels[coluna_index].b 
+            time = np.linspace(0, len(sinal) / original_rate, len(sinal))
+
+            # Plotar o RMS somente se o checkbox correspondente estiver marcado
+            sinal_vrms, time_vrms = processamento.vrm_per_phase(self.sinal_filtrado[index], self.time_filtrado[index])
+
+            self.sinal_vrms.append(sinal_vrms)
+            self.time_vrms.append(time_vrms)
+            if plotar_rms:
+                plot_vrms(self.time_filtrado[index], self.sinal_filtrado[index], canais, coluna_index, self.time_vrms[index], self.sinal_vrms[index], original_rate, self.timestamp, self.pasta_nome)
+            index = index + 1
+
+    def general_fasor(self, parametros, canais):
+        self.modulo = []
+        self.angulo = []
+        self.complexo = []
+        freq_amostragem = float(parametros['freq_amostragem'])
+        freq_corte_max = float(parametros['freq_corte_max'])
+        colunas_selecionadas = parametros['colunas']
+        signals = np.array(self.rec.analog)
+        original_rate = self.original_rate
+        target_rate = freq_amostragem
+        cutoff_freq = freq_corte_max
+        plotar_filtro = parametros.get('plotar_filtro', False)
+        plotar_rms = parametros.get('plotar_rms', False)
+        plotar_fasores = parametros.get('plotar_fasores', False)
+        index = 0
+
+        for coluna in colunas_selecionadas:
+            coluna_index = self.rec.analog_channel_ids.index(coluna)
+            sinal = signals[coluna_index]
+            scale_factor = self.rec.cfg.analog_channels[coluna_index].a
+            offset = self.rec.cfg.analog_channels[coluna_index].b 
+            time = np.linspace(0, len(sinal) / original_rate, len(sinal))
+
+            # Plotar os fasores somente se o checkbox correspondente estiver marcado
+            signal_modulo, signal_ang, signal_complexo = processamento.fasor(self.sinal_filtrado[index], self.time_filtrado[index])
+            self.modulo.append(signal_modulo)
+            self.angulo.append(signal_ang)
+            self.complexo.append(signal_complexo)
+            index = index + 1
+
+        print("004.1_____ CORIGIR ANGULO")  
+        self.angulo = processamento.ang_correction(self.angulo)
+        if plotar_fasores:
+            plot_fasor(self.modulo, self.angulo, self.pasta_nome)
+        
+
+    def general_impendace(self, parametros, canais):
+        mod_ang_complexo = processamento.calculo_impedancia(self.modulo, self.angulo)
+        plot_XR(mod_ang_complexo)
+        
+        # if plotar_fasores and self.modulo and self.angulo:
+        #     plot_fasor([self.angulo[0], self.angulo[2], self.angulo[4]], [self.angulo[1], self.angulo[3], self.angulo[5]], self.pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
+        #     #plot_fasor(, angulo, pasta_nome)
+        #     #plotar_fasores(modulo, angulo, 18)
+            
+
+
     def carregar_parametros():
         parametros_padroes = {
             'arquivo1': '',
@@ -163,44 +324,41 @@ class processamento():
             angulo = 180 + (angulo + 180)
         return angulo
 
-    def calculo_impedancia(modulo, angulo):
-        Zmod = [[0] * 960 for _ in range(3)]  # Inicializa uma lista 3x960
-        Zang = [[0] * 960 for _ in range(3)]  # Inicializa uma lista 3x960
-
-        for i in range(960):
+    def ang_correction(angulo):
+        for i in range(0, len(angulo[0])):
             #angulo[0][i] = angulo[0][i] - angulo0[i]  
             # Ajuste das demais fases com relação à Fase A
-            angulo[1][i] = angulo[1][i] - angulo[0][i]
-            angulo[2][i] = angulo[2][i] - angulo[0][i]  
-            angulo[3][i] = angulo[3][i] - angulo[0][i]  
-            angulo[4][i] = angulo[4][i] - angulo[0][i]  
-            angulo[5][i] = angulo[5][i] - angulo[0][i]
-            #angulo[0][i] = angulo[0][i] - angulo[0][i]  
+            angulo[1][i] = processamento.ajustar_angulo(angulo[1][i] - angulo[0][i])
+            angulo[2][i] = processamento.ajustar_angulo(angulo[2][i] - angulo[0][i]) 
+            angulo[3][i] = processamento.ajustar_angulo(angulo[3][i] - angulo[0][i])
+            angulo[4][i] = processamento.ajustar_angulo(angulo[4][i] - angulo[0][i])
+            angulo[5][i] = processamento.ajustar_angulo(angulo[5][i] - angulo[0][i])
+            angulo[0][i] = processamento.ajustar_angulo(angulo[0][i] - angulo[0][i])
 
-        #correção para valores que ultrapassam 180° ou -180°
-        for j in range(6):  
-            for i in range(960):  
-                angulo[j][i] = processamento.ajustar_angulo(angulo[j][i])
+        return angulo
 
-        for i in range(960):
+    def calculo_impedancia(modulo, angulo):
+        Zmod = [[0] * len(angulo[0]-120) for _ in range(int(round(len(angulo)/2)))]  # Inicializa uma lista 3x960
+        Zang = [[0] * len(angulo[0]-120) for _ in range(int(round(len(angulo)/2)))]  # Inicializa uma lista 3x960
+        Complexo = [[0] * len(angulo[0]-120) for _ in range(int(round(len(angulo)/2)))]  # Inicializa uma lista 3x960
+
+
+        for i in range(120, len(angulo[0])):
             #Calculo dos modulos e angulos das impedancias
             Zmod[0][i] = modulo[0][i] / modulo[1][i]
             Zmod[1][i] = modulo[2][i] / modulo[3][i]
             Zmod[2][i] = modulo[4][i] / modulo[5][i]
 
-            Zang[0][i] = angulo[0][i] + angulo[1][i]
-            Zang[1][i] = angulo[2][i] + angulo[3][i]
-            Zang[2][i] = angulo[4][i] + angulo[5][i]
+            Zang[0][i] = processamento.ajustar_angulo(angulo[0][i] - angulo[1][i])
+            Zang[1][i] = processamento.ajustar_angulo(angulo[2][i] - angulo[3][i])
+            Zang[2][i] = processamento.ajustar_angulo(angulo[4][i] - angulo[5][i])
         
-        for j in range(3):
-            for i in range(960):
-                Zang[j][i] = processamento.ajustar_angulo(Zang[j][i])
-        
-        Zmodulo = Zmod * np.cos(Zang)
-        Zangulo = Zmod * np.sin(Zang)
+            Complexo[0][i] = (Zmod[0][i] * np.cos(Zang[0][i]*math.pi/180)) + 1j*(Zmod[0][i] * np.sin(Zang[0][i]*math.pi/180))
+            Complexo[1][i] = (Zmod[1][i] * np.cos(Zang[1][i]*math.pi/180)) + 1j*(Zmod[1][i] * np.sin(Zang[1][i]*math.pi/180))
+            Complexo[2][i] = (Zmod[2][i] * np.cos(Zang[2][i]*math.pi/180)) + 1j*(Zmod[1][i] * np.sin(Zang[2][i]*math.pi/180))
 
-        complexo = Zmodulo + 1j*Zangulo
-        return complexo
+
+        return Complexo
     
     def detectar_tipo_falta(vrms_values):
         if len(vrms_values) < 12:
