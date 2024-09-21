@@ -184,9 +184,9 @@ class processamento():
 
         for i in range(960):
             #Calculo dos modulos e angulos das impedancias
-            Zmod[0][i] = abs(modulo[0][i] / modulo[1][i])
-            Zmod[1][i] = abs(modulo[2][i] / modulo[3][i])
-            Zmod[2][i] = abs(modulo[4][i] / modulo[5][i])
+            Zmod[0][i] = modulo[0][i] / modulo[1][i]
+            Zmod[1][i] = modulo[2][i] / modulo[3][i]
+            Zmod[2][i] = modulo[4][i] / modulo[5][i]
 
             Zang[0][i] = angulo[0][i] + angulo[1][i]
             Zang[1][i] = angulo[2][i] + angulo[3][i]
