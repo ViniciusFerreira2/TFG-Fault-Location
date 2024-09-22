@@ -20,12 +20,12 @@ class processamento():
         print("004_____ REALIZANDO RMS")
         processamento.general_rms(self, parametros, canais)
         print("004_____ REALIZANDO FASOR")
-        processamento.general_fasor(self, parametros, canais)
-        print("005_____ REALIZANDO IMPENDANCIA")
-        complexo = processamento.general_impendace(self, parametros, canais)
+        signal = processamento.general_fasor(self, parametros, canais)
         print(f"XXX_____REALIZANDO COMPONENTES SIMETRICAS")
-        processamento.symmetrical_componentes(parametros, complexo)
-
+        processamento.symmetrical_componentes(parametros, signal)
+        print("005_____ REALIZANDO IMPENDANCIA")
+        processamento.general_impendace(self, parametros, canais)
+       
     def init_process(self, parametros, canais):
         #global modulo, angulo
         vrms_final = []
@@ -139,9 +139,6 @@ class processamento():
         for coluna in colunas_selecionadas:
             coluna_index = self.rec.analog_channel_ids.index(coluna)
             sinal = signals[coluna_index]
-            scale_factor = self.rec.cfg.analog_channels[coluna_index].a
-            offset = self.rec.cfg.analog_channels[coluna_index].b 
-            time = np.linspace(0, len(sinal) / original_rate, len(sinal))
 
             # Plotar os fasores somente se o checkbox correspondente estiver marcado
             signal_modulo, signal_ang, signal_complexo = processamento.fasor(self.sinal_filtrado[index], self.time_filtrado[index])
@@ -150,10 +147,11 @@ class processamento():
             self.complexo.append(signal_complexo)
             index = index + 1
 
-        print("004.1_____ CORIGIR ANGULO")  
+        print("004.1_____ CORRIGIR ANGULO")  
         self.angulo = processamento.ang_correction(self.angulo)
         if plotar_fasores:
             plot_fasor(self.modulo, self.angulo, self.pasta_nome)
+        return signal_complexo
 
     def general_impendace(self, parametros, canais):
         mod_ang_complexo = processamento.calculo_impedancia(self.modulo, self.angulo)
@@ -367,16 +365,9 @@ class processamento():
 
         return Complexo
 
-    def symmetrical_componentes(parametros, complexo):
-        # Inicialização de uma lista para modulo e angulo da impedancia
-        mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        Z_seq = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        Z_seq_mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        Z_seq_ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-
+    def line_data(parameters):
         # Extrai os valores de dadoslinha
-        dadoslinha = parametros.get('dadoslinha', {})
+        dadoslinha = parameters.get('dadoslinha', {})
 
         # Extrai e converte os valores para float, caso não sejam numéricos
         R1 = float(dadoslinha.get('R1', 0.0))
@@ -391,6 +382,16 @@ class processamento():
         R0 = R0 * L
         X0 = X0 * L
 
+    def symmetrical_componentes(parametros, complexo):
+        # Inicialização de uma lista para modulo e angulo da impedancia
+        mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        seq = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        seq_mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        seq_ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]    
+        Z_seq_mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo)/2)))]
+        Z_seq_ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo)/2)))]    
+
         # Definição das matrizes de síntese e análise
         a = cmath.exp(2j * cmath.pi / 3)
         a2 = a**2
@@ -404,25 +405,55 @@ class processamento():
             mod[0][i], ang[0][i] = cmath.polar(complexo[0][i])
             mod[1][i], ang[1][i] = cmath.polar(complexo[1][i])
             mod[2][i], ang[2][i] = cmath.polar(complexo[2][i])
+            mod[3][i], ang[3][i] = cmath.polar(complexo[3][i])
+            mod[4][i], ang[4][i] = cmath.polar(complexo[4][i])
+            mod[5][i], ang[5][i] = cmath.polar(complexo[5][i])
 
-            aux_A_ang = ang[0][i]
-            aux_B_ang = ang[1][i]
-            aux_C_ang = ang[2][i]
+            aux_AV_mod = mod[0][i]
+            aux_BV_mod = mod[1][i]
+            aux_CV_mod = mod[2][i]
+            aux_AI_mod = mod[3][i]
+            aux_BI_mod = mod[4][i]
+            aux_CI_mod = mod[5][i]
 
-            aux_A_mod = mod[0][i]
-            aux_B_mod = mod[1][i]
-            aux_C_mod = mod[2][i]
+            aux_AV_ang = ang[0][i]
+            aux_BV_ang = ang[1][i]
+            aux_CV_ang = ang[2][i]
+            aux_AI_ang = ang[3][i]
+            aux_BI_ang = ang[4][i]
+            aux_CI_ang = ang[5][i]
 
-            Z_seq[0][i] = ((aux_A_mod*np.cos(aux_A_ang) + aux_B_mod*np.cos(aux_B_ang) + aux_C_mod*np.cos(aux_C_ang)) + 1j*(aux_A_mod*np.sin(aux_A_ang) + aux_B_mod*np.sin(aux_B_ang) + aux_C_mod*np.sin(aux_C_ang)))/3
-            Z_seq[1][i] = ((aux_A_mod*np.cos(aux_A_ang) + aux_B_mod*np.cos(aux_B_ang)*np.cos(120*math.pi/180) + aux_C_mod*np.cos(aux_C_ang))*np.cos((-120)*math.pi/180) + 1j*(aux_A_mod*np.sin(aux_A_ang) + aux_B_mod*np.sin(aux_B_ang)*np.sin(120*math.pi/180) + aux_C_mod*np.sin(aux_C_ang)*np.sin((-120)*math.pi/180)))/3
-            Z_seq[2][i] = ((aux_A_mod*np.cos(aux_A_ang) + aux_B_mod*np.cos(aux_B_ang)*np.cos((-120)*math.pi/180) + aux_C_mod*np.cos(aux_C_ang))*np.cos(120*math.pi/180) + 1j*(aux_A_mod*np.sin(aux_A_ang) + aux_B_mod*np.sin(aux_B_ang)*np.sin((-120)*math.pi/180) + aux_C_mod*np.sin(aux_C_ang)*np.sin(120*math.pi/180)))/3
+            seq[0][i] = ((aux_AV_mod*np.cos(aux_AV_ang) + aux_BV_mod*np.cos(aux_BV_ang) + aux_CV_mod*np.cos(aux_CV_ang)) + 1j*(aux_AV_mod*np.sin(aux_AV_ang) + aux_BV_mod*np.sin(aux_BV_ang) + aux_CV_mod*np.sin(aux_CV_ang)))/3
+            seq[1][i] = ((aux_AV_mod*np.cos(aux_AV_ang) + aux_BV_mod*np.cos(aux_BV_ang)*np.cos(120*math.pi/180) + aux_CV_mod*np.cos(aux_CV_ang))*np.cos((-120)*math.pi/180) + 1j*(aux_AV_mod*np.sin(aux_AV_ang) + aux_BV_mod*np.sin(aux_BV_ang)*np.sin(120*math.pi/180) + aux_CV_mod*np.sin(aux_CV_ang)*np.sin((-120)*math.pi/180)))/3
+            seq[2][i] = ((aux_AV_mod*np.cos(aux_AV_ang) + aux_BV_mod*np.cos(aux_BV_ang)*np.cos((-120)*math.pi/180) + aux_CV_mod*np.cos(aux_CV_ang))*np.cos(120*math.pi/180) + 1j*(aux_AV_mod*np.sin(aux_AV_ang) + aux_BV_mod*np.sin(aux_BV_ang)*np.sin((-120)*math.pi/180) + aux_CV_mod*np.sin(aux_CV_ang)*np.sin(120*math.pi/180)))/3
+            seq[3][i] = ((aux_AI_mod*np.cos(aux_AI_ang) + aux_BI_mod*np.cos(aux_BI_ang) + aux_CI_mod*np.cos(aux_CI_ang)) + 1j*(aux_AI_mod*np.sin(aux_AI_ang) + aux_BI_mod*np.sin(aux_BI_ang) + aux_CI_mod*np.sin(aux_CI_ang)))/3
+            seq[4][i] = ((aux_AI_mod*np.cos(aux_AI_ang) + aux_BI_mod*np.cos(aux_BI_ang)*np.cos(120*math.pi/180) + aux_CI_mod*np.cos(aux_CI_ang))*np.cos((-120)*math.pi/180) + 1j*(aux_AI_mod*np.sin(aux_AI_ang) + aux_BI_mod*np.sin(aux_BI_ang)*np.sin(120*math.pi/180) + aux_CI_mod*np.sin(aux_CI_ang)*np.sin((-120)*math.pi/180)))/3
+            seq[5][i] = ((aux_AI_mod*np.cos(aux_AI_ang) + aux_BI_mod*np.cos(aux_BI_ang)*np.cos((-120)*math.pi/180) + aux_CI_mod*np.cos(aux_CI_ang))*np.cos(120*math.pi/180) + 1j*(aux_AI_mod*np.sin(aux_AI_ang) + aux_BI_mod*np.sin(aux_BI_ang)*np.sin((-120)*math.pi/180) + aux_CI_mod*np.sin(aux_CI_ang)*np.sin(120*math.pi/180)))/3
 
-            Z_seq_mod[0][i], Z_seq_ang[0][i] = cmath.polar(Z_seq[0][i])
-            Z_seq_mod[1][i], Z_seq_ang[1][i] = cmath.polar(Z_seq[1][i])
-            Z_seq_mod[2][i], Z_seq_ang[2][i] = cmath.polar(Z_seq[2][i])
+            seq_mod[0][i], seq_ang[0][i] = cmath.polar(seq[0][i])
+            seq_mod[1][i], seq_ang[1][i] = cmath.polar(seq[1][i])
+            seq_mod[2][i], seq_ang[2][i] = cmath.polar(seq[2][i])
+            seq_mod[3][i], seq_ang[3][i] = cmath.polar(seq[3][i])
+            seq_mod[4][i], seq_ang[4][i] = cmath.polar(seq[4][i])
+            seq_mod[5][i], seq_ang[5][i] = cmath.polar(seq[5][i])
+            
+            Z_seq_mod[0][i] = seq_mod[0][i] / seq_mod [1][i]
+            Z_seq_mod[1][i] = seq_mod[2][i] / seq_mod [3][i]
+            Z_seq_mod[2][i] = seq_mod[4][i] / seq_mod [5][i]
 
+            Z_seq_ang[0][i] = seq_ang[0][i] - seq_ang[1][i]
+            Z_seq_ang[1][i] = seq_ang[2][i] - seq_ang[3][i]
+            Z_seq_ang[2][i] = seq_ang[4][i] - seq_ang[5][i]
+
+        for i in range(3):
+            # Converter o ângulo de graus para radianos
+            angulo_rad = np.radians(Z_seq_ang[i])
+            
+            # Parte real e imaginária
+            real = Z_seq_mod[i] * np.cos(angulo_rad)
+            imaginaria = Z_seq_mod[i] * np.sin(angulo_rad)
         #plot_XR(Z_seq,R1,X1,R0,X0)
-        plot_Z_seq(Z_seq_mod, Z_seq_ang)
+        plot_Z_seq(real, imaginaria)
 
     
     def detectar_tipo_falta(rms_values):
