@@ -8,11 +8,19 @@ from processamentodados import processamento
 class JanelaSelecaoArquivos:
     def __init__(self, root, parametros):
         self.root = root
-        self.arquivo1 = tk.StringVar(value=parametros['arquivo1'])
-        self.arquivo2 = tk.StringVar(value=parametros['arquivo2'])
-        self.freq_amostragem = tk.DoubleVar(value=parametros['freq_amostragem'])
-        self.freq_corte_max = tk.DoubleVar(value=parametros['freq_corte_max'])
         self.parametros = parametros
+        self.arquivo1 = tk.StringVar(value=parametros.get('arquivo1', ''))
+        self.arquivo2 = tk.StringVar(value=parametros.get('arquivo2', ''))
+        self.freq_amostragem = tk.DoubleVar(value=parametros.get('freq_amostragem', 0.0))
+        self.freq_corte_max = tk.DoubleVar(value=parametros.get('freq_corte_max', 0.0))
+        self.R1 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('R1', 0.0))
+        self.X1 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('X1', 0.0))
+        self.R0 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('R0', 0.0))
+        self.X0 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('X0', 0.0))
+        self.L = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('L', 0.0))
+
+        self.entries_caracteristicas = {}  # Para armazenar as caixas de entrada de características
+
         self.colunas = []  # Para armazenar os nomes das colunas
 
         self.criar_interface()
@@ -52,14 +60,12 @@ class JanelaSelecaoArquivos:
         frame_caracteristicas.pack(pady=10)
         tk.Label(frame_caracteristicas, text="Características da Linha").grid(row=0, column=0, columnspan=3, pady=5)
 
-        self.entries_caracteristicas = {}
-
         for i, (label, unit) in enumerate([("R1", "Ω/km"), ("X1", "Ω/km"), ("R0", "Ω/km"), ("X0", "Ω/km"), ("L", "km")]):
             tk.Label(frame_caracteristicas, text=f"{label}").grid(row=i+1, column=0, padx=5, sticky="w")
             entry = tk.Entry(frame_caracteristicas, width=15)
             entry.grid(row=i+1, column=1, padx=5, sticky="w")
             tk.Label(frame_caracteristicas, text=unit).grid(row=i+1, column=2, padx=5, sticky="w")
-            self.entries_caracteristicas[label] = entry
+            self.entries_caracteristicas[label] = entry  # Salva a referência à caixa de entrada
 
         # Caixas de entrada de frequências
         frame_frequencias = tk.Frame(self.root)
@@ -200,8 +206,21 @@ class JanelaSelecaoArquivos:
         arquivo = filedialog.askopenfilename(title="Selecione o segundo arquivo", filetypes=[("Arquivos DAT", "*.dat")])
         if arquivo:
             self.arquivo2.set(arquivo)
-
+    
     def confirmar(self):
+        # Cria um dicionário para armazenar os valores de 'dadoslinha'
+        dados_linha = {
+            'R1': self.R1.get(),
+            'X1': self.X1.get(),
+            'R0': self.R0.get(),
+            'X0': self.X0.get(),
+            'L': self.L.get()
+        }
+
+        # Adiciona os dados ao dicionário de parâmetros
+        self.parametros['dadoslinha'] = dados_linha
+
+        # Atualiza os outros parâmetros
         self.parametros['arquivo1'] = self.arquivo1.get()
         self.parametros['arquivo2'] = self.arquivo2.get()
         self.parametros['freq_amostragem'] = self.freq_amostragem.get()
@@ -224,25 +243,10 @@ class JanelaSelecaoArquivos:
         self.parametros['plotar_rms'] = self.plotar_rms.get()
         self.parametros['plotar_fasores'] = self.plotar_fasores.get()
 
-        
-
+        # Chama o método para salvar os parâmetros
         processamento.salvar_parametros(self.parametros)
         self.initial()
 
 
     def initial(self):
         processamento.process(self, self.parametros, self.colunas)
-
-
-
-# if __name__ == "__main__":
-#     parametros = {
-#         'arquivo1': '',
-#         'arquivo2': '',
-#         'freq_amostragem': 0.0,
-#         'freq_corte_max': 0.0
-#     }
-
-#     root = tk.Tk()
-#     app = JanelaSelecaoArquivos(root, parametros)
-#     root.mainloop()

@@ -103,37 +103,92 @@ def plotar_polarformat(modulo, angulo, tempo_selecionado):
     plt.title("Gráfico de Fasores")
     plt.show()
 
-def plot_XR(complexo):
+def plot_XR(complexo, R1, X1, R0, X0):
     """
     Função para plotar os dados dos fasores (parte real no eixo X e parte imaginária no eixo Y),
-    destacando o início, meio e fim das ligações.
+    criando gráficos separados para cada componente de Z_seq.
     """
-    # Configurar o tamanho da figura
+    
+    # Plot para Z_seq[0]
     plt.figure(figsize=(10, 6))
-
-    # Para cada conjunto de dados (coluna) no complexo
-    for i in range(0, len(complexo)):
-        # Extrair parte real (eixo X) e parte imaginária (eixo Y)
-        real_part = np.real(complexo[i])
-        imag_part = np.imag(complexo[i])
-
-
-        # Plotar a linha conectando todos os pontos
-        plt.plot(real_part, imag_part, linestyle='-', label=f'Fasor {i+1}')
-
-        # # Destacar o início (círculo verde), meio (quadrado azul) e fim (triângulo vermelho)
-        # plt.plot(real_part[inicio], imag_part[inicio], 'go', label=f'Início {i+1}')  # Círculo verde
-        # plt.plot(real_part[meio], imag_part[meio], 'bs', label=f'Meio {i+1}')  # Quadrado azul
-        # plt.plot(real_part[fim], imag_part[fim], 'r^', label=f'Fim {i+1}')  # Triângulo vermelho
-
+    real_part = np.real(complexo[0])
+    imag_part = np.imag(complexo[0])
+    plt.plot(real_part, imag_part, linestyle='-', label='Fasor Z_seq[0]')
+    
+    # Linha da origem até 4x R0 e X0
+    plt.plot([0, 4 * R0], [0, 4 * X0], linestyle='--', color='red', label='Linha até (4*R0, 4*X0)')
+    
     # Configurar títulos e rótulos dos eixos
-    plt.title("Gráfico de Fasores: Parte Real (X) vs Parte Imaginária (Y)")
+    plt.title("Gráfico de Fasores Z_seq[0]: Parte Real (X) vs Parte Imaginária (Y)")
     plt.xlabel("Parte Real")
     plt.ylabel("Parte Imaginária")
-
-    # Adicionar grid e legenda
     plt.grid(True)
     plt.legend()
+    plt.show()
 
-    # Exibir o gráfico
+    # Plot para Z_seq[1]
+    plt.figure(figsize=(10, 6))
+    real_part = np.real(complexo[1])
+    imag_part = np.imag(complexo[1])
+    plt.plot(real_part, imag_part, linestyle='-', label='Fasor Z_seq[1]')
+    
+    # Linha da origem até 4x R1 e X1
+    plt.plot([0, 4 * R1], [0, 4 * X1], linestyle='--', color='red', label='Linha até (4*R1, 4*X1)')
+    
+    # Configurar títulos e rótulos dos eixos
+    plt.title("Gráfico de Fasores Z_seq[1]: Parte Real (X) vs Parte Imaginária (Y)")
+    plt.xlabel("Parte Real")
+    plt.ylabel("Parte Imaginária")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    # Plot para Z_seq[2]
+    plt.figure(figsize=(10, 6))
+    real_part = np.real(complexo[2])
+    imag_part = np.imag(complexo[2])
+    plt.plot(real_part, imag_part, linestyle='-', label='Fasor Z_seq[2]')
+    
+    # Linha da origem até 4x R1 e X1
+    plt.plot([0, 4 * R1], [0, 4 * X1], linestyle='--', color='red', label='Linha até (4*R1, 4*X1)')
+    
+    # Configurar títulos e rótulos dos eixos
+    plt.title("Gráfico de Fasores Z_seq[2]: Parte Real (X) vs Parte Imaginária (Y)")
+    plt.xlabel("Parte Real")
+    plt.ylabel("Parte Imaginária")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+def plot_Z_seq(Z_seq_mod, Z_seq_ang):
+    """
+    Função para plotar os módulos e ângulos de Z_seq em subplots.
+    Z_seq_mod: Lista com os módulos da sequência de impedâncias.
+    Z_seq_ang: Lista com os ângulos da sequência de impedâncias.
+    """
+    # Criar a figura e os subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Plotar o módulo de Z_seq no primeiro subplot
+    for i in range(3):
+        ax1.plot(Z_seq_mod[i], label=f'Módulo Z_seq[{i}]')
+    ax1.set_title('Módulo de Z_seq')
+    ax1.set_xlabel('Índice')
+    ax1.set_ylabel('Módulo')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Plotar o ângulo de Z_seq no segundo subplot
+    for i in range(3):
+        ax2.plot(np.degrees(Z_seq_ang[i]), label=f'Ângulo Z_seq[{i}]')  # Convertendo radianos para graus
+    ax2.set_title('Ângulo de Z_seq')
+    ax2.set_xlabel('Índice')
+    ax2.set_ylabel('Ângulo (graus)')
+    ax2.legend()
+    ax2.grid(True)
+
+    # Ajustar layout
+    plt.tight_layout()
+
+    # Mostrar os gráficos
     plt.show()

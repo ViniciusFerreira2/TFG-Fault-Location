@@ -22,8 +22,9 @@ class processamento():
         print("004_____ REALIZANDO FASOR")
         processamento.general_fasor(self, parametros, canais)
         print("005_____ REALIZANDO IMPENDANCIA")
-        processamento.general_impendace(self, parametros, canais)
-        print(f"XXX_____FINALIZADO")
+        complexo = processamento.general_impendace(self, parametros, canais)
+        print(f"XXX_____REALIZANDO COMPONENTES SIMETRICAS")
+        processamento.symmetrical_componentes(parametros, complexo)
 
     def init_process(self, parametros, canais):
         #global modulo, angulo
@@ -97,16 +98,11 @@ class processamento():
         colunas_selecionadas = parametros['colunas']
         signals = np.array(self.rec.analog)
         original_rate = self.original_rate
-        target_rate = freq_amostragem
-        cutoff_freq = freq_corte_max
-        plotar_filtro = parametros.get('plotar_filtro', False)
         plotar_rms = parametros.get('plotar_rms', False)
 
         self.sinal_vrms = []
         self.time_vrms = []
         index = 0
-
-        
 
         for coluna in colunas_selecionadas:
             coluna_index = self.rec.analog_channel_ids.index(coluna)
@@ -158,26 +154,32 @@ class processamento():
         self.angulo = processamento.ang_correction(self.angulo)
         if plotar_fasores:
             plot_fasor(self.modulo, self.angulo, self.pasta_nome)
-        
 
     def general_impendace(self, parametros, canais):
         mod_ang_complexo = processamento.calculo_impedancia(self.modulo, self.angulo)
-        plot_XR(mod_ang_complexo)
+        #plot_XR(mod_ang_complexo, 2, 2, 2, 2)
+        return mod_ang_complexo
         
         # if plotar_fasores and self.modulo and self.angulo:
         #     plot_fasor([self.angulo[0], self.angulo[2], self.angulo[4]], [self.angulo[1], self.angulo[3], self.angulo[5]], self.pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
         #     #plot_fasor(, angulo, pasta_nome)
         #     #plotar_fasores(modulo, angulo, 18)
             
-
-
     def carregar_parametros():
+
         parametros_padroes = {
             'arquivo1': '',
             'arquivo2': '',
             'freq_amostragem': 1000.0,
             'freq_corte_max': 75.0,
-            'colunas': []
+            'colunas': [],
+            'dadoslinha': {
+                'R1': 0.0,
+                'X1': 0.0,
+                'R0': 0.0,
+                'X0': 0.0,
+                'L': 0.0
+            }
         }
 
         if os.path.exists(CONFIG_FILE):
@@ -185,11 +187,15 @@ class processamento():
                 parametros = json.load(f)
                 # Atualiza os parâmetros com os valores padrão para chaves ausentes
                 for chave, valor_padrao in parametros_padroes.items():
-                    parametros.setdefault(chave, valor_padrao)
+                    if chave == 'dadoslinha':
+                        # Para 'dadoslinha', atualiza as subchaves
+                        parametros[chave] = {**parametros_padroes[chave], **parametros.get(chave, {})}
+                    else:
+                        parametros.setdefault(chave, valor_padrao)
                 return parametros
         else:
             return parametros_padroes
-
+   
     def salvar_parametros(parametros):
         with open(CONFIG_FILE, 'w') as f:
             json.dump(parametros, f)
@@ -338,6 +344,7 @@ class processamento():
         return angulo
 
     def calculo_impedancia(modulo, angulo):
+
         Zmod = [[0] * len(angulo[0]-120) for _ in range(int(round(len(angulo)/2)))]  # Inicializa uma lista 3x960
         Zang = [[0] * len(angulo[0]-120) for _ in range(int(round(len(angulo)/2)))]  # Inicializa uma lista 3x960
         Complexo = [[0] * len(angulo[0]-120) for _ in range(int(round(len(angulo)/2)))]  # Inicializa uma lista 3x960
@@ -359,18 +366,76 @@ class processamento():
 
 
         return Complexo
+
+    def symmetrical_componentes(parametros, complexo):
+        # Inicialização de uma lista para modulo e angulo da impedancia
+        mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        Z_seq = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        Z_seq_mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        Z_seq_ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+
+        # Extrai os valores de dadoslinha
+        dadoslinha = parametros.get('dadoslinha', {})
+
+        # Extrai e converte os valores para float, caso não sejam numéricos
+        R1 = float(dadoslinha.get('R1', 0.0))
+        X1 = float(dadoslinha.get('X1', 0.0))
+        R0 = float(dadoslinha.get('R0', 0.0))
+        X0 = float(dadoslinha.get('X0', 0.0))
+        L = float(dadoslinha.get('L', 0.0))
+
+        # Realiza os cálculos com os valores numéricos
+        R1 = R1 * L
+        X1 = X1 * L
+        R0 = R0 * L
+        X0 = X0 * L
+
+        # Definição das matrizes de síntese e análise
+        a = cmath.exp(2j * cmath.pi / 3)
+        a2 = a**2
+        a_ang = math.degrees(cmath.phase(a))
+        a_aux = abs(a)*np.sin(a_ang)
+        a2_ang = math.degrees(cmath.phase(a2))
+        a2_aux = abs(a)*np.sin(a2_ang)
+        
+        #Conversão da impedancia de entrada para forma polar
+        for i in range(0, len(complexo[0])):
+            mod[0][i], ang[0][i] = cmath.polar(complexo[0][i])
+            mod[1][i], ang[1][i] = cmath.polar(complexo[1][i])
+            mod[2][i], ang[2][i] = cmath.polar(complexo[2][i])
+
+            aux_A_ang = ang[0][i]
+            aux_B_ang = ang[1][i]
+            aux_C_ang = ang[2][i]
+
+            aux_A_mod = mod[0][i]
+            aux_B_mod = mod[1][i]
+            aux_C_mod = mod[2][i]
+
+            Z_seq[0][i] = ((aux_A_mod*np.cos(aux_A_ang) + aux_B_mod*np.cos(aux_B_ang) + aux_C_mod*np.cos(aux_C_ang)) + 1j*(aux_A_mod*np.sin(aux_A_ang) + aux_B_mod*np.sin(aux_B_ang) + aux_C_mod*np.sin(aux_C_ang)))/3
+            Z_seq[1][i] = ((aux_A_mod*np.cos(aux_A_ang) + aux_B_mod*np.cos(aux_B_ang)*np.cos(120*math.pi/180) + aux_C_mod*np.cos(aux_C_ang))*np.cos((-120)*math.pi/180) + 1j*(aux_A_mod*np.sin(aux_A_ang) + aux_B_mod*np.sin(aux_B_ang)*np.sin(120*math.pi/180) + aux_C_mod*np.sin(aux_C_ang)*np.sin((-120)*math.pi/180)))/3
+            Z_seq[2][i] = ((aux_A_mod*np.cos(aux_A_ang) + aux_B_mod*np.cos(aux_B_ang)*np.cos((-120)*math.pi/180) + aux_C_mod*np.cos(aux_C_ang))*np.cos(120*math.pi/180) + 1j*(aux_A_mod*np.sin(aux_A_ang) + aux_B_mod*np.sin(aux_B_ang)*np.sin((-120)*math.pi/180) + aux_C_mod*np.sin(aux_C_ang)*np.sin(120*math.pi/180)))/3
+
+            Z_seq_mod[0][i], Z_seq_ang[0][i] = cmath.polar(Z_seq[0][i])
+            Z_seq_mod[1][i], Z_seq_ang[1][i] = cmath.polar(Z_seq[1][i])
+            Z_seq_mod[2][i], Z_seq_ang[2][i] = cmath.polar(Z_seq[2][i])
+
+        #plot_XR(Z_seq,R1,X1,R0,X0)
+        plot_Z_seq(Z_seq_mod, Z_seq_ang)
+
     
-    def detectar_tipo_falta(vrms_values):
-        if len(vrms_values) < 12:
+    def detectar_tipo_falta(rms_values):
+        if len(rms_values) < 12:
             print("Não há dados suficientes para detectar a falta.")
             return None
 
-        vrms_A = np.array(vrms_values[0])
-        vrms_B = np.array(vrms_values[1])
-        vrms_C = np.array(vrms_values[2])
-        irms_A = np.array(vrms_values[3])
-        irms_B = np.array(vrms_values[4])
-        irms_C = np.array(vrms_values[5])
+        vrms_A = np.array(rms_values[0])
+        vrms_B = np.array(rms_values[1])
+        vrms_C = np.array(rms_values[2])
+        irms_A = np.array(rms_values[3])
+        irms_B = np.array(rms_values[4])
+        irms_C = np.array(rms_values[5])
 
         Z_pos = 3.70678
         Z_neg = 3.70678
