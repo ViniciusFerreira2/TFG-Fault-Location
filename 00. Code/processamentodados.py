@@ -21,11 +21,11 @@ class processamento():
         processamento.general_rms(self, parametros, canais)
         print("004_____ REALIZANDO FASOR")
         signal = processamento.general_fasor(self, parametros, canais)
-        print("LENSIGNAL", len(signal))
         print(f"XXX_____REALIZANDO COMPONENTES SIMETRICAS")
-        processamento.symmetrical_componentes(parametros, signal)
+        processamento.general_symmetrical_components(self, parametros, signal)
+        #processamento.symmetrical_componentes(parametros, signal)
         print("005_____ REALIZANDO IMPENDANCIA")
-        processamento.general_impendace(self, parametros, canais)
+        #processamento.general_impendace(self, parametros, canais)
        
     def init_process(self, parametros, canais):
         #global modulo, angulo
@@ -137,7 +137,7 @@ class processamento():
             sinal = signals[coluna_index]
 
             # Plotar os fasores somente se o checkbox correspondente estiver marcado
-            signal_modulo, signal_ang, signal_complexo = processamento.fasor(self.sinal_filtrado[index], self.time_filtrado[index])
+            signal_modulo, signal_ang, signal_complexo = processamento.fasor(self.sinal_filtrado[index], self.time_filtrado[index]) #RADIANOS
             self.modulo.append(signal_modulo)
             self.angulo.append(signal_ang)
             self.complexo.append(signal_complexo)
@@ -150,10 +150,10 @@ class processamento():
 
         return self.complexo
 
-    def general_impendace(self, parametros, canais):
-        mod_ang_complexo = processamento.calculo_impedancia(self.modulo, self.angulo)
-        #plot_XR(mod_ang_complexo, 2, 2, 2, 2)
-        return mod_ang_complexo
+    def general_symmetrical_components(self, parametros, signal):
+
+        seq_V, seq_I = processamento.symmetrical_componentes(signal)
+        processamento.impedance_symmetrical_components(seq_V, seq_I)
         
         # if plotar_fasores and self.modulo and self.angulo:
         #     plot_fasor([self.angulo[0], self.angulo[2], self.angulo[4]], [self.angulo[1], self.angulo[3], self.angulo[5]], self.pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
@@ -295,7 +295,7 @@ class processamento():
             ang_ant = ang
 
             mod_values.append(vrms)
-            ang_values.append(ang)
+            ang_values.append(ang) #GRAUS
             
             # Atualiza as listas de yk e xt
             del yk[0]  # Remove a primeira amostra
@@ -306,16 +306,16 @@ class processamento():
 
         # Conversão para numpy array
         signal_modulo = np.array(mod_values)
-        signal_ang = np.array(ang_values)
+        signal_ang = np.array(ang_values) #GRAUS
         # Parte real e imaginária
-        real_values = signal_modulo * np.cos(signal_ang)
-        imag_values = signal_modulo * np.sin(signal_ang)
+        real_values = signal_modulo * np.cos((signal_ang*math.pi/180)) #RADIANOS
+        imag_values = signal_modulo * np.sin((signal_ang*math.pi/180))
 
         # Sinal complexo (opcional, se quiser juntar as partes real e imaginária em um array complexo)
         sinal_complexo = real_values + 1j * imag_values
 
         #signal_ang_mtz = signal_ang.reshape(960,1)
-        return signal_modulo, signal_ang, sinal_complexo
+        return signal_modulo, signal_ang, sinal_complexo #SINAL COMPLEXO TA CERTO
     
     def ajustar_angulo(angulo):
         limiteang = 180
@@ -379,67 +379,67 @@ class processamento():
         R0 = R0 * L
         X0 = X0 * L
 
-    def symmetrical_componentes(parametros, complexo):
+    def symmetrical_componentes(complexo):
+
+        mod_values = []
+        ang_values = []
         # Inicialização de uma lista para modulo e angulo da impedancia
-        mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        seq = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        seq_mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        seq_ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]    
-        Z_seq_mod = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo)/2)))]
-        Z_seq_ang = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo)/2)))]
-        Z_seq_real = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo)/2)))]
-        Z_seq_imag = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo)/2)))]     
+        seq_voltage = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        seq_current = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]   
+
 
         # Definição das matrizes de síntese e análise
         a = cmath.exp(2j * cmath.pi / 3)
-        a2 = a**2
-        a_ang = math.degrees(cmath.phase(a))
-        a_aux = abs(a)*np.sin(a_ang)
-        a2_ang = math.degrees(cmath.phase(a2))
-        a2_aux = abs(a)*np.sin(a2_ang)
-        
+
         #Conversão da impedancia de entrada para forma polar
         for i in range(0, len(complexo[0])):
-            mod[0][i], ang[0][i] = cmath.polar(complexo[0][i])
-            mod[1][i], ang[1][i] = cmath.polar(complexo[1][i])
-            mod[2][i], ang[2][i] = cmath.polar(complexo[2][i])
-            mod[3][i], ang[3][i] = cmath.polar(complexo[3][i])
-            mod[4][i], ang[4][i] = cmath.polar(complexo[4][i])
-            mod[5][i], ang[5][i] = cmath.polar(complexo[5][i])
 
-            aux_AV_mod = mod[0][i]
-            aux_AI_mod = mod[1][i]
-            aux_BV_mod = mod[2][i]
-            aux_BI_mod = mod[3][i]
-            aux_CV_mod = mod[4][i]
-            aux_CI_mod = mod[5][i]
+            A = np.array([
+                [1, 1, 1],
+                [1, a, a**2],
+                [1, a**2, a]
+            ])
 
-            aux_AV_ang = ang[0][i]
-            aux_AI_ang = ang[1][i]
-            aux_BV_ang = ang[2][i]
-            aux_BI_ang = ang[3][i]
-            aux_CV_ang = ang[4][i]
-            aux_CI_ang = ang[5][i]
+            B_V = np.array([complexo[0][i], complexo[2][i], complexo[4][i]])
 
-            seq[0][i] = ((aux_AV_mod*np.cos(aux_AV_ang) + aux_BV_mod*np.cos(aux_BV_ang) + aux_CV_mod*np.cos(aux_CV_ang)) + 1j*(aux_AV_mod*np.sin(aux_AV_ang) + aux_BV_mod*np.sin(aux_BV_ang) + aux_CV_mod*np.sin(aux_CV_ang)))/3
-            seq[1][i] = ((aux_AV_mod*np.cos(aux_AV_ang) + aux_BV_mod*np.cos(aux_BV_ang)*np.cos(120*math.pi/180) + aux_CV_mod*np.cos(aux_CV_ang))*np.cos((-120)*math.pi/180) + 1j*(aux_AV_mod*np.sin(aux_AV_ang) + aux_BV_mod*np.sin(aux_BV_ang)*np.sin(120*math.pi/180) + aux_CV_mod*np.sin(aux_CV_ang)*np.sin((-120)*math.pi/180)))/3
-            seq[2][i] = ((aux_AV_mod*np.cos(aux_AV_ang) + aux_BV_mod*np.cos(aux_BV_ang)*np.cos((-120)*math.pi/180) + aux_CV_mod*np.cos(aux_CV_ang))*np.cos(120*math.pi/180) + 1j*(aux_AV_mod*np.sin(aux_AV_ang) + aux_BV_mod*np.sin(aux_BV_ang)*np.sin((-120)*math.pi/180) + aux_CV_mod*np.sin(aux_CV_ang)*np.sin(120*math.pi/180)))/3
-            seq[3][i] = ((aux_AI_mod*np.cos(aux_AI_ang) + aux_BI_mod*np.cos(aux_BI_ang) + aux_CI_mod*np.cos(aux_CI_ang)) + 1j*(aux_AI_mod*np.sin(aux_AI_ang) + aux_BI_mod*np.sin(aux_BI_ang) + aux_CI_mod*np.sin(aux_CI_ang)))/3
-            seq[4][i] = ((aux_AI_mod*np.cos(aux_AI_ang) + aux_BI_mod*np.cos(aux_BI_ang)*np.cos(120*math.pi/180) + aux_CI_mod*np.cos(aux_CI_ang))*np.cos((-120)*math.pi/180) + 1j*(aux_AI_mod*np.sin(aux_AI_ang) + aux_BI_mod*np.sin(aux_BI_ang)*np.sin(120*math.pi/180) + aux_CI_mod*np.sin(aux_CI_ang)*np.sin((-120)*math.pi/180)))/3
-            seq[5][i] = ((aux_AI_mod*np.cos(aux_AI_ang) + aux_BI_mod*np.cos(aux_BI_ang)*np.cos((-120)*math.pi/180) + aux_CI_mod*np.cos(aux_CI_ang))*np.cos(120*math.pi/180) + 1j*(aux_AI_mod*np.sin(aux_AI_ang) + aux_BI_mod*np.sin(aux_BI_ang)*np.sin((-120)*math.pi/180) + aux_CI_mod*np.sin(aux_CI_ang)*np.sin(120*math.pi/180)))/3
+            B_I = np.array([complexo[1][i], complexo[3][i], complexo[5][i]])
 
-            seq_mod[0][i], seq_ang[0][i] = cmath.polar(seq[0][i])
-            seq_mod[1][i], seq_ang[1][i] = cmath.polar(seq[1][i])
-            seq_mod[2][i], seq_ang[2][i] = cmath.polar(seq[2][i])
-            seq_mod[3][i], seq_ang[3][i] = cmath.polar(seq[3][i])
-            seq_mod[4][i], seq_ang[4][i] = cmath.polar(seq[4][i])
-            seq_mod[5][i], seq_ang[5][i] = cmath.polar(seq[5][i])
-            
-            if i>80: #antes de 80 os valores estão como 0, estava dando erro por divisão por zero
-                Z_seq_mod[0][i] = seq_mod[0][i] / seq_mod [3][i]
-                Z_seq_mod[1][i] = seq_mod[1][i] / seq_mod [4][i]
-                Z_seq_mod[2][i] = seq_mod[2][i] / seq_mod [5][i]
+            seq_V = (1/3)*(np.dot(A, B_V))
+            seq_V = seq_V.T
+
+            seq_I = (1/3)*(np.dot(A, B_I))
+            seq_I = seq_I.T
+
+            seq_voltage[0][i] = seq_V[0]
+            seq_voltage[1][i] = seq_V[1]
+            seq_voltage[2][i] = seq_V[2]
+
+            seq_current[0][i] = seq_I[0]
+            seq_current[1][i] = seq_I[1]
+            seq_current[2][i] = seq_I[2]
+        return seq_voltage, seq_current
+
+    def impedance_symmetrical_components(seq_V, seq_I):
+        
+        seq_mod = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
+        seq_ang = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
+        Z_seq_mod = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
+        Z_seq_ang = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
+        Z_seq_real = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
+        Z_seq_imag = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]  
+
+        for i in range(0, len(seq_V[0])):    
+            seq_mod[0][i], seq_ang[0][i] = cmath.polar(seq_V[0][i])
+            seq_mod[1][i], seq_ang[1][i] = cmath.polar(seq_V[1][i])
+            seq_mod[2][i], seq_ang[2][i] = cmath.polar(seq_V[2][i])
+            seq_mod[3][i], seq_ang[3][i] = cmath.polar(seq_I[0][i])
+            seq_mod[4][i], seq_ang[4][i] = cmath.polar(seq_I[1][i])
+            seq_mod[5][i], seq_ang[5][i] = cmath.polar(seq_I[2][i])   
+            if i > 80:  # antes de 80 os valores estão como 0, estava dando erro por divisão por zero
+                # Verificar se os divisores são iguais a zero e atribuir 1 se forem
+                Z_seq_mod[0][i] = seq_mod[0][i] / (seq_mod[3][i])
+                Z_seq_mod[1][i] = seq_mod[1][i] / (seq_mod[4][i])
+                Z_seq_mod[2][i] = seq_mod[2][i] / (seq_mod[5][i])
 
                 Z_seq_ang[0][i] = seq_ang[0][i] - seq_ang[3][i]
                 Z_seq_ang[1][i] = seq_ang[1][i] - seq_ang[4][i]
@@ -453,22 +453,21 @@ class processamento():
                 Z_seq_ang[1][i] = 0
                 Z_seq_ang[2][i] = 0
 
-            # Converter o ângulo de graus para radianos
-            angulo_rad_0 = (Z_seq_ang[0][i])*math.pi/180
-            angulo_rad_1 = (Z_seq_ang[1][i])*math.pi/180
-            angulo_rad_2 = (Z_seq_ang[2][i])*math.pi/180
-            
             # Parte real e imaginária
-            Z_seq_real[0][i] = Z_seq_mod[0][i] * np.cos(angulo_rad_0)
-            Z_seq_real[1][i] = Z_seq_mod[1][i] * np.cos(angulo_rad_1)
-            Z_seq_real[2][i] = Z_seq_mod[2][i] * np.cos(angulo_rad_2)
+            Z_seq_real[0][i] = Z_seq_mod[0][i] * np.cos(Z_seq_ang[0][i])
+            Z_seq_real[1][i] = Z_seq_mod[1][i] * np.cos(Z_seq_ang[1][i])
+            Z_seq_real[2][i] = Z_seq_mod[2][i] * np.cos(Z_seq_ang[2][i])
 
-            Z_seq_imag[0][i] = Z_seq_mod[0][i] * np.sin(angulo_rad_0)
-            Z_seq_imag[1][i] = Z_seq_mod[1][i] * np.sin(angulo_rad_1)
-            Z_seq_imag[2][i]= Z_seq_mod[2][i] * np.sin(angulo_rad_2)
-
-        #plot_XR(Z_seq,R1,X1,R0,X0)
-        plot_Z_seq(Z_seq_real, Z_seq_imag)
+            Z_seq_imag[0][i] = Z_seq_mod[0][i] * np.sin(Z_seq_ang[0][i])
+            Z_seq_imag[1][i] = Z_seq_mod[1][i] * np.sin(Z_seq_ang[1][i])
+            Z_seq_imag[2][i] = Z_seq_mod[2][i] * np.sin(Z_seq_ang[2][i])
+        # Z_seq_r = np.array(Z_seq_real)
+        # Z_seq_i = np.array(Z_seq_imag)
+        # sinal_complex = Z_seq_r + 1j*Z_seq_i
+        # print("SINAL100", sinal_complex[0][100])
+       
+        # plot_XR(sinal_complex,(0.0166*223.3),(0.2624*223.3),(0.4422*223.3),(223.3*1.3189))
+        plot_Z_seq(Z_seq_mod, Z_seq_ang)
 
     
     def detectar_tipo_falta(rms_values):

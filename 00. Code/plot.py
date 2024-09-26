@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import comtrade
+import cmath
 from datetime import datetime
 
 
@@ -160,18 +161,29 @@ def plot_XR(complexo, R1, X1, R0, X0):
     plt.legend()
     plt.show()
 
+
 def plot_Z_seq(Z_seq_mod, Z_seq_ang):
     """
     Função para plotar os módulos e ângulos de Z_seq em subplots.
     Z_seq_mod: Lista com os módulos da sequência de impedâncias.
     Z_seq_ang: Lista com os ângulos da sequência de impedâncias.
     """
+    linha_seq1= (0.0166*223.3) + 1j*(0.2624*223.3)
+    linha_seq0 = (0.4422*223.3) + 1j*(223.3*1.3189)
+    linha_seq1_mod, linha_seq1_ang = cmath.polar(linha_seq1)
+    linha_seq0_mod, linha_seq0_ang = cmath.polar(linha_seq0)
+
     # Criar a figura e os subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
     # Plotar o módulo de Z_seq no primeiro subplot
     for i in range(3):
         ax1.plot(Z_seq_mod[i], label=f'Módulo Z_seq[{i}]')
+    
+    # Adicionar as linhas constantes para linha_seq0_mod e linha_seq1_mod
+    ax1.axhline(y=linha_seq0_mod, color='r', linestyle='--', label=f'Linha Seq0 (Módulo): {linha_seq0_mod:.2f}')
+    ax1.axhline(y=linha_seq1_mod, color='b', linestyle='--', label=f'Linha Seq1 (Módulo): {linha_seq1_mod:.2f}')
+
     ax1.set_title('Módulo de Z_seq')
     ax1.set_xlabel('Índice')
     ax1.set_ylabel('Módulo')
@@ -181,6 +193,9 @@ def plot_Z_seq(Z_seq_mod, Z_seq_ang):
     # Plotar o ângulo de Z_seq no segundo subplot
     for i in range(3):
         ax2.plot(np.degrees(Z_seq_ang[i]), label=f'Ângulo Z_seq[{i}]')  # Convertendo radianos para graus
+    ax2.axhline(y=np.degrees(linha_seq0_ang), color='r', linestyle='--', label=f'Linha Seq0 (Ângulo): {np.degrees(linha_seq0_ang):.2f}°')
+    ax2.axhline(y=np.degrees(linha_seq1_ang), color='b', linestyle='--', label=f'Linha Seq1 (Ângulo): {np.degrees(linha_seq1_ang):.2f}°')
+    
     ax2.set_title('Ângulo de Z_seq')
     ax2.set_xlabel('Índice')
     ax2.set_ylabel('Ângulo (graus)')
