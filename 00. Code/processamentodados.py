@@ -20,9 +20,9 @@ class processamento():
         print("004_____ REALIZANDO RMS")
         processamento.general_rms(self, parametros, canais)
         print("004_____ REALIZANDO FASOR")
-        signal = processamento.general_fasor(self, parametros, canais)
+        signal, rms = processamento.general_fasor(self, parametros, canais)
         print(f"XXX_____REALIZANDO COMPONENTES SIMETRICAS")
-        processamento.general_symmetrical_components(self, parametros, signal)
+        processamento.general_symmetrical_components(self, parametros, signal, rms)
         #processamento.symmetrical_componentes(parametros, signal)
         print("005_____ REALIZANDO IMPENDANCIA")
         #processamento.general_impendace(self, parametros, canais)
@@ -120,6 +120,7 @@ class processamento():
             if plotar_rms:
                 plot_vrms(self.time_filtrado[index], self.sinal_filtrado[index], canais, coluna_index, self.time_vrms[index], self.sinal_vrms[index], original_rate, self.timestamp, self.pasta_nome)
             index = index + 1
+        return sinal_vrms
 
     def general_fasor(self, parametros, canais):
         self.modulo = []
@@ -148,11 +149,11 @@ class processamento():
         if plotar_fasores:
             plot_fasor(self.modulo, self.angulo, self.pasta_nome)
 
-        return self.complexo
+        return self.complexo, self.modulo
 
-    def general_symmetrical_components(self, parametros, signal):
+    def general_symmetrical_components(self, parametros, signal, rms):
 
-        seq_V, seq_I = processamento.symmetrical_componentes(signal)
+        seq_V, seq_I = processamento.symmetrical_componentes(signal, rms)
         processamento.impedance_symmetrical_components(seq_V, seq_I)
         
         # if plotar_fasores and self.modulo and self.angulo:
@@ -379,10 +380,8 @@ class processamento():
         R0 = R0 * L
         X0 = X0 * L
 
-    def symmetrical_componentes(complexo):
+    def symmetrical_componentes(complexo, rms):
 
-        mod_values = []
-        ang_values = []
         # Inicialização de uma lista para modulo e angulo da impedancia
         seq_voltage = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
         seq_current = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]   
@@ -390,7 +389,6 @@ class processamento():
 
         # Definição das matrizes de síntese e análise
         a = cmath.exp(2j * cmath.pi / 3)
-
         #Conversão da impedancia de entrada para forma polar
         for i in range(0, len(complexo[0])):
 
@@ -410,13 +408,22 @@ class processamento():
             seq_I = (1/3)*(np.dot(A, B_I))
             seq_I = seq_I.T
 
-            seq_voltage[0][i] = seq_V[0]
-            seq_voltage[1][i] = seq_V[1]
-            seq_voltage[2][i] = seq_V[2]
+            if i == 100:
+                print("TENSAOSEQ0", seq_V[0])
+                print("TENSAOSEQ1", seq_V[1])
+                print("TENSAOSEQ2", seq_V[2])
+                print("TENSAOSEQ0", seq_I[0])
+                print("TENSAOSEQ1", seq_I[1])
+                print("TENSAOSEQ2", seq_I[2])
 
-            seq_current[0][i] = seq_I[0]
-            seq_current[1][i] = seq_I[1]
-            seq_current[2][i] = seq_I[2]
+            seq_voltage[0][i] = seq_V[0] if abs(seq_V[0]) > (rms[0][i]*0.01) else 0
+            seq_voltage[1][i] = seq_V[1] if abs(seq_V[1]) > (rms[2][i]*0.01) else 0   
+            seq_voltage[2][i] = seq_V[2] if abs(seq_V[2]) > (rms[4][i]*0.01) else 0
+
+            seq_current[0][i] = seq_I[0] if abs(seq_I[0]) > (rms[1][i]*0.01) else 0
+            seq_current[1][i] = seq_I[1] if abs(seq_I[1]) > (rms[3][i]*0.01) else 0
+            seq_current[2][i] = seq_I[2] if abs(seq_I[2]) > (rms[5][i]*0.01) else 0
+
         return seq_voltage, seq_current
 
     def impedance_symmetrical_components(seq_V, seq_I):
@@ -429,21 +436,23 @@ class processamento():
         Z_seq_imag = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]  
 
         for i in range(0, len(seq_V[0])):    
+
             seq_mod[0][i], seq_ang[0][i] = cmath.polar(seq_V[0][i])
             seq_mod[1][i], seq_ang[1][i] = cmath.polar(seq_V[1][i])
             seq_mod[2][i], seq_ang[2][i] = cmath.polar(seq_V[2][i])
             seq_mod[3][i], seq_ang[3][i] = cmath.polar(seq_I[0][i])
             seq_mod[4][i], seq_ang[4][i] = cmath.polar(seq_I[1][i])
             seq_mod[5][i], seq_ang[5][i] = cmath.polar(seq_I[2][i])   
+
             if i > 80:  # antes de 80 os valores estão como 0, estava dando erro por divisão por zero
                 # Verificar se os divisores são iguais a zero e atribuir 1 se forem
-                Z_seq_mod[0][i] = seq_mod[0][i] / (seq_mod[3][i])
-                Z_seq_mod[1][i] = seq_mod[1][i] / (seq_mod[4][i])
-                Z_seq_mod[2][i] = seq_mod[2][i] / (seq_mod[5][i])
+                Z_seq_mod[0][i] = (seq_mod[3][i]) #/ seq_mod[3][i]) if ((abs(seq_V[0][i]) != 0) and (abs(seq_I[0][i]) != 0)) else 0
+                Z_seq_mod[1][i] = (seq_mod[4][i]) #/ seq_mod[4][i]) if ((abs(seq_V[1][i]) != 0) and (abs(seq_I[1][i]) != 0)) else 0
+                Z_seq_mod[2][i] = (seq_mod[5][i]) #/ seq_mod[5][i]) if ((abs(seq_V[2][i]) != 0) and (abs(seq_I[2][i]) != 0)) else 0
 
-                Z_seq_ang[0][i] = seq_ang[0][i] - seq_ang[3][i]
-                Z_seq_ang[1][i] = seq_ang[1][i] - seq_ang[4][i]
-                Z_seq_ang[2][i] = seq_ang[2][i] - seq_ang[5][i]
+                Z_seq_ang[0][i] = (seq_ang[3][i]) #- seq_ang[3][i]) if ((abs(seq_V[0][i]) != 0) and (abs(seq_I[0][i]) != 0)) else 0
+                Z_seq_ang[1][i] = (seq_ang[4][i]) #- seq_ang[4][i]) if ((abs(seq_V[1][i]) != 0) and (abs(seq_I[1][i]) != 0)) else 0
+                Z_seq_ang[2][i] = (seq_ang[5][i]) #- seq_ang[5][i]) if ((abs(seq_V[2][i]) != 0) and (abs(seq_I[2][i]) != 0)) else 0
             else:
                 Z_seq_mod[0][i] = 0
                 Z_seq_mod[1][i] = 0
@@ -461,12 +470,13 @@ class processamento():
             Z_seq_imag[0][i] = Z_seq_mod[0][i] * np.sin(Z_seq_ang[0][i])
             Z_seq_imag[1][i] = Z_seq_mod[1][i] * np.sin(Z_seq_ang[1][i])
             Z_seq_imag[2][i] = Z_seq_mod[2][i] * np.sin(Z_seq_ang[2][i])
-        # Z_seq_r = np.array(Z_seq_real)
-        # Z_seq_i = np.array(Z_seq_imag)
-        # sinal_complex = Z_seq_r + 1j*Z_seq_i
-        # print("SINAL100", sinal_complex[0][100])
+        Z_seq_r = np.array(Z_seq_real)
+        Z_seq_i = np.array(Z_seq_imag)
+        sinal_complex = Z_seq_r + 1j*Z_seq_i
+        #print("SINAL100", sinal_complex[0][100])
        
-        # plot_XR(sinal_complex,(0.0166*223.3),(0.2624*223.3),(0.4422*223.3),(223.3*1.3189))
+        plot_XR(sinal_complex,(0.0166*223.3),(0.2624*223.3),(0.4422*223.3),(223.3*1.3189))
+        #plot_Z_seq(seq_mod, seq_ang)
         plot_Z_seq(Z_seq_mod, Z_seq_ang)
 
     

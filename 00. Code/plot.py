@@ -117,7 +117,7 @@ def plot_XR(complexo, R1, X1, R0, X0):
     plt.plot(real_part, imag_part, linestyle='-', label='Fasor Z_seq[0]')
     
     # Linha da origem até 4x R0 e X0
-    plt.plot([0, 4 * R0], [0, 4 * X0], linestyle='--', color='red', label='Linha até (4*R0, 4*X0)')
+    plt.plot([0, R0], [0, X0], linestyle='--', color='red', label='Linha até (4*R0, 4*X0)')
     
     # Configurar títulos e rótulos dos eixos
     plt.title("Gráfico de Fasores Z_seq[0]: Parte Real (X) vs Parte Imaginária (Y)")
@@ -160,7 +160,6 @@ def plot_XR(complexo, R1, X1, R0, X0):
     plt.grid(True)
     plt.legend()
     plt.show()
-
 
 def plot_Z_seq(Z_seq_mod, Z_seq_ang):
     """
