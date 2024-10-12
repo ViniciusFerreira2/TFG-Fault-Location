@@ -7,22 +7,26 @@ from processamentodados import processamento
 
 class JanelaSelecaoArquivos:
     def __init__(self, root, parametros):
+        # Carrega os parâmetros salvos do arquivo JSON
+        parametros = processamento.carregar_parametros()
+
+        # Inicializa os parâmetros e os widgets da interface com os valores carregados
         self.root = root
         self.parametros = parametros
         self.arquivo1 = tk.StringVar(value=parametros.get('arquivo1', ''))
         self.arquivo2 = tk.StringVar(value=parametros.get('arquivo2', ''))
         self.freq_amostragem = tk.DoubleVar(value=parametros.get('freq_amostragem', 0.0))
         self.freq_corte_max = tk.DoubleVar(value=parametros.get('freq_corte_max', 0.0))
+        self.opcao_fase = tk.StringVar(value=parametros.get('fase_em_falta', ''))
         self.R1 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('R1', 0.0))
         self.X1 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('X1', 0.0))
         self.R0 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('R0', 0.0))
         self.X0 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('X0', 0.0))
         self.L = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('L', 0.0))
 
-        self.entries_caracteristicas = {}  # Para armazenar as caixas de entrada de características
-
-        self.colunas = []  # Para armazenar os nomes das colunas
-
+        # Continua com o restante da inicialização...
+        self.entries_caracteristicas = {}
+        self.colunas = []
         self.criar_interface()
 
     def criar_interface(self):
@@ -60,10 +64,12 @@ class JanelaSelecaoArquivos:
         frame_caracteristicas.pack(pady=10)
         tk.Label(frame_caracteristicas, text="Características da Linha").grid(row=0, column=0, columnspan=3, pady=5)
 
+        # Adiciona caixas de texto e seus rótulos com as características da linha
         for i, (label, unit) in enumerate([("R1", "Ω/km"), ("X1", "Ω/km"), ("R0", "Ω/km"), ("X0", "Ω/km"), ("L", "km")]):
             tk.Label(frame_caracteristicas, text=f"{label}").grid(row=i+1, column=0, padx=5, sticky="w")
             entry = tk.Entry(frame_caracteristicas, width=15)
             entry.grid(row=i+1, column=1, padx=5, sticky="w")
+            entry.insert(0, str(self.parametros.get('dadoslinha', {}).get(label, 0.0)))  # Insere o valor salvo no JSON
             tk.Label(frame_caracteristicas, text=unit).grid(row=i+1, column=2, padx=5, sticky="w")
             self.entries_caracteristicas[label] = entry  # Salva a referência à caixa de entrada
 
@@ -79,6 +85,13 @@ class JanelaSelecaoArquivos:
         label_freq_max.grid(row=1, column=0, padx=5, sticky="w")
         entry_freq_max = tk.Entry(frame_frequencias, textvariable=self.freq_corte_max, width=15)
         entry_freq_max.grid(row=1, column=1, padx=5, sticky="w")
+
+        # Lista suspensa para o tipo de falta
+        self.opcao_fase.set(self.parametros.get('fase_em_falta', ''))  # Preenche com o valor salvo no JSON
+        label_opcao_fase = tk.Label(self.root, text="Selecione as fases em falta:")
+        label_opcao_fase.pack(pady=10)
+        self.combo_fase = ttk.Combobox(self.root, textvariable=self.opcao_fase, values=["A-T", "B-T","C-T","AB","AC","BC","AB-T","AC-T","BC-T","ABC","ABC-T"], state="readonly")
+        self.combo_fase.pack(pady=10)
 
         # Lista suspensa para número de terminais
         self.opcao_terminal = tk.StringVar(value="")
@@ -206,15 +219,14 @@ class JanelaSelecaoArquivos:
         arquivo = filedialog.askopenfilename(title="Selecione o segundo arquivo", filetypes=[("Arquivos DAT", "*.dat")])
         if arquivo:
             self.arquivo2.set(arquivo)
-    
+
     def confirmar(self):
-        # Cria um dicionário para armazenar os valores de 'dadoslinha'
         dados_linha = {
-            'R1': self.R1.get(),
-            'X1': self.X1.get(),
-            'R0': self.R0.get(),
-            'X0': self.X0.get(),
-            'L': self.L.get()
+            'R1': float(self.entries_caracteristicas['R1'].get()),
+            'X1': float(self.entries_caracteristicas['X1'].get()),
+            'R0': float(self.entries_caracteristicas['R0'].get()),
+            'X0': float(self.entries_caracteristicas['X0'].get()),
+            'L': float(self.entries_caracteristicas['L'].get())
         }
 
         # Adiciona os dados ao dicionário de parâmetros
@@ -225,6 +237,9 @@ class JanelaSelecaoArquivos:
         self.parametros['arquivo2'] = self.arquivo2.get()
         self.parametros['freq_amostragem'] = self.freq_amostragem.get()
         self.parametros['freq_corte_max'] = self.freq_corte_max.get()
+
+        # Adiciona a fase em falta ao dicionário de parâmetros
+        self.parametros['fase_em_falta'] = self.opcao_fase.get()
 
         # Coleta as colunas selecionadas das listas suspensas
         colunas_selecionadas = []
@@ -243,10 +258,11 @@ class JanelaSelecaoArquivos:
         self.parametros['plotar_rms'] = self.plotar_rms.get()
         self.parametros['plotar_fasores'] = self.plotar_fasores.get()
 
-        # Chama o método para salvar os parâmetros
+        # Salva os parâmetros no arquivo JSON
         processamento.salvar_parametros(self.parametros)
         self.initial()
 
+    
 
     def initial(self):
         processamento.process(self, self.parametros, self.colunas)

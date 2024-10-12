@@ -8,9 +8,13 @@ import comtrade
 from plot import*
 from datetime import datetime
 import matplotlib.pyplot as plt
+import heapq
 
-# Nome do arquivo de configuração
-CONFIG_FILE = 'config.json'
+# Obtém o diretório onde o script está localizado
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Caminho completo para salvar o arquivo config.json na mesma pasta do script
+CONFIG_FILE = os.path.join(script_dir, 'config.json')
 
 class processamento():
     def process(self, parametros, canais):
@@ -18,13 +22,16 @@ class processamento():
         print("003_____ REALIZANDO FILTRO")
         processamento.general_filter(self, parametros, canais)
         print("004_____ REALIZANDO RMS")
-        processamento.general_rms(self, parametros, canais)
+        rms=processamento.general_rms(self, parametros, canais)
         print("004_____ REALIZANDO FASOR")
-        signal, rms = processamento.general_fasor(self, parametros, canais)
-        print(f"XXX_____REALIZANDO COMPONENTES SIMETRICAS")
-        processamento.general_symmetrical_components(self, parametros, signal, rms)
-        #processamento.symmetrical_componentes(parametros, signal)
-        print("005_____ REALIZANDO IMPENDANCIA")
+        signal, modulorms = processamento.general_fasor(self, parametros, canais)
+        print("005_____REALIZANDO LOCALIZAÇÃO DA FALTA")
+        processamento.general_fault_location(self, parametros, signal, rms)
+        print("006_____REALIZANDO COMPONENTES SIMETRICAS")
+        processamento.general_symmetrical_components(self, signal, modulorms)
+        print("007_____REALIZANDO COMPONENTES SIMETRICAS")
+        processamento.general_fault_location(self, parametros)
+        print("008_____ REALIZANDO IMPENDANCIA")
         #processamento.general_impendace(self, parametros, canais)
        
     def init_process(self, parametros, canais):
@@ -35,9 +42,7 @@ class processamento():
         arquivo2 = parametros['arquivo2']
         freq_amostragem = float(parametros['freq_amostragem'])
         freq_corte_max = float(parametros['freq_corte_max'])
-        colunas_selecionadas = parametros['colunas']
-        print("COLUNAS", colunas_selecionadas)
-        
+        colunas_selecionadas = parametros['colunas']        
 
         self.rec = comtrade.Comtrade()
         try:
@@ -120,7 +125,7 @@ class processamento():
             if plotar_rms:
                 plot_vrms(self.time_filtrado[index], self.sinal_filtrado[index], canais, coluna_index, self.time_vrms[index], self.sinal_vrms[index], original_rate, self.timestamp, self.pasta_nome)
             index = index + 1
-        return sinal_vrms
+        return self.sinal_vrms
 
     def general_fasor(self, parametros, canais):
         self.modulo = []
@@ -151,51 +156,35 @@ class processamento():
 
         return self.complexo, self.modulo
 
-    def general_symmetrical_components(self, parametros, signal, rms):
+    def general_symmetrical_components(self, signal, rms):
 
         seq_V, seq_I = processamento.symmetrical_componentes(signal, rms)
+        #processamento.fault_detection(seq_I)
         processamento.impedance_symmetrical_components(seq_V, seq_I)
-        
-        # if plotar_fasores and self.modulo and self.angulo:
-        #     plot_fasor([self.angulo[0], self.angulo[2], self.angulo[4]], [self.angulo[1], self.angulo[3], self.angulo[5]], self.pasta_nome) #[angulo[1], angulo[3], angulo[5]], pasta_nome)
-        #     #plot_fasor(, angulo, pasta_nome)
-        #     #plotar_fasores(modulo, angulo, 18)
-            
-    def carregar_parametros():
 
-        parametros_padroes = {
-            'arquivo1': '',
-            'arquivo2': '',
-            'freq_amostragem': 1000.0,
-            'freq_corte_max': 75.0,
-            'colunas': [],
-            'dadoslinha': {
-                'R1': 0.0,
-                'X1': 0.0,
-                'R0': 0.0,
-                'X0': 0.0,
-                'L': 0.0
-            }
-        }
+    def general_fault_location(self, parametros, signal, rms):
+        # Obtém o valor da fase em falta do dicionário de parâmetros
+        fases_afetadas = parametros.get('fase_em_falta', '')
+        # print("TAMANHOSINALFASOR", len(signal[1]))
+        # print("TAMANHOSINALRMS", len(rms[1]))
+        fault_time = processamento.fault_detection(rms)
+        #processamento.SAHA_1_Terminal_Fault_Location(fases_afetadas)
+        processamento.Takagi_single_terminal(fases_afetadas, signal, fault_time)
 
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, 'r') as f:
-                parametros = json.load(f)
-                # Atualiza os parâmetros com os valores padrão para chaves ausentes
-                for chave, valor_padrao in parametros_padroes.items():
-                    if chave == 'dadoslinha':
-                        # Para 'dadoslinha', atualiza as subchaves
-                        parametros[chave] = {**parametros_padroes[chave], **parametros.get(chave, {})}
-                    else:
-                        parametros.setdefault(chave, valor_padrao)
-                return parametros
-        else:
-            return parametros_padroes
-   
     def salvar_parametros(parametros):
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(parametros, f)
+        # Salvar os parâmetros existentes no JSON
+        with open('parametros.json', 'w') as f:
+            json.dump(parametros, f, indent=4)
 
+    def carregar_parametros():
+        try:
+            with open('parametros.json', 'r') as f:
+                parametros = json.load(f)
+                return parametros
+        except FileNotFoundError:
+            print("Arquivo de parâmetros não encontrado. Criando novo.")
+            return {}
+    
     def filter_signal(signal, original_rate, target_rate, cutoff_freq):
         # Reamostragem do sinal
         num_samples = int(len(signal) * target_rate / original_rate)
@@ -265,13 +254,14 @@ class processamento():
 
         # Pré-preenchimento para as primeiras amostras
         for i in range(sample_rate):
-            yk.append(signal[i])
-            xt.append([1, math.sin(omega*time[i]), math.cos(omega*time[i]), time[i]])
-            mod_values.append(0)
-            ang_values.append(0)
+             yk.append(signal[i])
+             xt.append([1, math.sin(omega*time[i]), math.cos(omega*time[i]), time[i]])
+        #     mod_values.append(0)
+        #     ang_values.append(0)
 
         # Processamento das amostras restantes
         for j in range(sample_rate, len(signal)):
+        #for j in range(len(signal)):
             xt_array = np.array(xt)
             yk_array = np.array(yk)
 
@@ -386,6 +376,8 @@ class processamento():
         seq_voltage = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
         seq_current = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]   
 
+        #Definição da porcentagem do filtro
+        filter_percentage = 0.05
 
         # Definição das matrizes de síntese e análise
         a = cmath.exp(2j * cmath.pi / 3)
@@ -408,21 +400,13 @@ class processamento():
             seq_I = (1/3)*(np.dot(A, B_I))
             seq_I = seq_I.T
 
-            if i == 100:
-                print("TENSAOSEQ0", seq_V[0])
-                print("TENSAOSEQ1", seq_V[1])
-                print("TENSAOSEQ2", seq_V[2])
-                print("TENSAOSEQ0", seq_I[0])
-                print("TENSAOSEQ1", seq_I[1])
-                print("TENSAOSEQ2", seq_I[2])
+            seq_voltage[0][i] = seq_V[0] if abs(seq_V[0]) > (rms[0][i]*filter_percentage) else 0
+            seq_voltage[1][i] = seq_V[1] if abs(seq_V[1]) > (rms[2][i]*filter_percentage) else 0   
+            seq_voltage[2][i] = seq_V[2] if abs(seq_V[2]) > (rms[4][i]*filter_percentage) else 0
 
-            seq_voltage[0][i] = seq_V[0] if abs(seq_V[0]) > (rms[0][i]*0.01) else 0
-            seq_voltage[1][i] = seq_V[1] if abs(seq_V[1]) > (rms[2][i]*0.01) else 0   
-            seq_voltage[2][i] = seq_V[2] if abs(seq_V[2]) > (rms[4][i]*0.01) else 0
-
-            seq_current[0][i] = seq_I[0] if abs(seq_I[0]) > (rms[1][i]*0.01) else 0
-            seq_current[1][i] = seq_I[1] if abs(seq_I[1]) > (rms[3][i]*0.01) else 0
-            seq_current[2][i] = seq_I[2] if abs(seq_I[2]) > (rms[5][i]*0.01) else 0
+            seq_current[0][i] = seq_I[0] if abs(seq_I[0]) > (rms[1][i]*filter_percentage) else 0
+            seq_current[1][i] = seq_I[1] if abs(seq_I[1]) > (rms[3][i]*filter_percentage) else 0
+            seq_current[2][i] = seq_I[2] if abs(seq_I[2]) > (rms[5][i]*filter_percentage) else 0
 
         return seq_voltage, seq_current
 
@@ -446,13 +430,13 @@ class processamento():
 
             if i > 80:  # antes de 80 os valores estão como 0, estava dando erro por divisão por zero
                 # Verificar se os divisores são iguais a zero e atribuir 1 se forem
-                Z_seq_mod[0][i] = (seq_mod[3][i]) #/ seq_mod[3][i]) if ((abs(seq_V[0][i]) != 0) and (abs(seq_I[0][i]) != 0)) else 0
-                Z_seq_mod[1][i] = (seq_mod[4][i]) #/ seq_mod[4][i]) if ((abs(seq_V[1][i]) != 0) and (abs(seq_I[1][i]) != 0)) else 0
-                Z_seq_mod[2][i] = (seq_mod[5][i]) #/ seq_mod[5][i]) if ((abs(seq_V[2][i]) != 0) and (abs(seq_I[2][i]) != 0)) else 0
+                Z_seq_mod[0][i] = (seq_mod[0][i] / seq_mod[3][i]) if ((abs(seq_V[0][i]) != 0) and (abs(seq_I[0][i]) != 0)) else 0
+                Z_seq_mod[1][i] = (seq_mod[1][i] / seq_mod[4][i]) if ((abs(seq_V[1][i]) != 0) and (abs(seq_I[1][i]) != 0)) else 0
+                Z_seq_mod[2][i] = (seq_mod[2][i] / seq_mod[5][i]) if ((abs(seq_V[2][i]) != 0) and (abs(seq_I[2][i]) != 0)) else 0
 
-                Z_seq_ang[0][i] = (seq_ang[3][i]) #- seq_ang[3][i]) if ((abs(seq_V[0][i]) != 0) and (abs(seq_I[0][i]) != 0)) else 0
-                Z_seq_ang[1][i] = (seq_ang[4][i]) #- seq_ang[4][i]) if ((abs(seq_V[1][i]) != 0) and (abs(seq_I[1][i]) != 0)) else 0
-                Z_seq_ang[2][i] = (seq_ang[5][i]) #- seq_ang[5][i]) if ((abs(seq_V[2][i]) != 0) and (abs(seq_I[2][i]) != 0)) else 0
+                Z_seq_ang[0][i] = (seq_ang[0][i] - seq_ang[3][i]) if ((abs(seq_V[0][i]) != 0) and (abs(seq_I[0][i]) != 0)) else 0
+                Z_seq_ang[1][i] = (seq_ang[1][i] - seq_ang[4][i]) if ((abs(seq_V[1][i]) != 0) and (abs(seq_I[1][i]) != 0)) else 0
+                Z_seq_ang[2][i] = (seq_ang[2][i] - seq_ang[5][i]) if ((abs(seq_V[2][i]) != 0) and (abs(seq_I[2][i]) != 0)) else 0
             else:
                 Z_seq_mod[0][i] = 0
                 Z_seq_mod[1][i] = 0
@@ -479,54 +463,224 @@ class processamento():
         #plot_Z_seq(seq_mod, seq_ang)
         plot_Z_seq(Z_seq_mod, Z_seq_ang)
 
-    
-    def detectar_tipo_falta(rms_values):
-        if len(rms_values) < 12:
-            print("Não há dados suficientes para detectar a falta.")
-            return None
+    def fault_detection(rms):
 
-        vrms_A = np.array(rms_values[0])
-        vrms_B = np.array(rms_values[1])
-        vrms_C = np.array(rms_values[2])
-        irms_A = np.array(rms_values[3])
-        irms_B = np.array(rms_values[4])
-        irms_C = np.array(rms_values[5])
+        fault_filter = 1.15
+        time = (80/4800)
+        for i in range(len(rms[1])):
+            time+=(1/4800)
+            if (abs(rms[1][i+80])*fault_filter) < (abs(rms[1][i+84])):
+                fault_time = i
+                break
+        print("TEMPO DA FALTA", time)
+        return fault_time              
 
-        Z_pos = 3.70678
-        Z_neg = 3.70678
-        Z_zero = 98.74326
+    def fault_type_detection(rms):
+       
+        current_A = heapq.nlargest(10, rms[1])
+        current_B = heapq.nlargest(10, rms[3])
+        current_C = heapq.nlargest(10, rms[5])
 
-        a = cmath.exp(2j * cmath.pi / 3)
+        current_A = sum(current_A) / len(current_A)
+        current_B = sum(current_B) / len(current_B)
+        current_C = sum(current_C) / len(current_C)
+        current_N = current_A+current_B+current_C
 
-        A = np.array([
-            [1, 1, 1],
-            [1, a, a**2],
-            [1, a**2, a]
-        ])
-        A_inv = (1 / 3) * np.array([
-            [1, 1, 1],
-            [1, a**2, a],
-            [1, a, a**2]
-        ])
+        # Determinando o valor máximo das correntes
+        max_current = max(current_A, current_B, current_C)
 
-        Z_seq = np.array([Z_pos, Z_neg, Z_zero])
-        Z_fase = np.dot(A, Z_seq)
+        # Porcentagens em relação à corrente máxima
+        percentage_A = current_A / max_current
+        percentage_B = current_B / max_current
+        percentage_C = current_C / max_current
 
-        z_falta_fase_A = vrms_A / irms_A
-        z_falta_fase_B = vrms_B / irms_B
-        z_falta_fase_C = vrms_C / irms_C
+        # Definindo os limites
+        limite_fase = 0.5  # Limite para identificar fases afetadas (50%)
+        limite_terra_corrente = 0.9  # Limite para identificar aterramento (10%)
 
-        z_fase_A = z_falta_fase_A / Z_fase[0]
-        z_fase_B = z_falta_fase_B / Z_fase[1]
-        z_fase_C = z_falta_fase_C / Z_fase[2]
+        # Verificando quais fases estão afetadas
+        fases_afetadas = []
+        if percentage_A > limite_fase:
+            fases_afetadas.append('A')
+        if percentage_B > limite_fase:
+            fases_afetadas.append('B')
+        if percentage_C > limite_fase:
+            fases_afetadas.append('C')
 
-        I_fase_zero = vrms_A / Z_zero
+        # Verificando se há falta para terra (corrente muito baixa em uma das fases)
+        terra = True
+        # Se qualquer fase tiver uma corrente extremamente baixa, consideramos que há falta para terra
+        if current_A > (limite_terra_corrente*current_B) and current_A > (limite_terra_corrente*current_C):
+            if current_N > (limite_terra_corrente*current_A):
+                terra = False
+        elif current_B > (limite_terra_corrente*current_A) and current_B > (limite_terra_corrente*current_C):
+            if current_N > (limite_terra_corrente*current_B):
+                terra = False
+        elif current_C > (limite_terra_corrente*current_A) and current_C > (limite_terra_corrente*current_B):
+            if current_N > (limite_terra_corrente*current_C):
+                terra = False
 
-        if (np.allclose(vrms_A, vrms_B, rtol=0.1) and np.allclose(vrms_A, vrms_C, rtol=0.1)):
-            tipo_falta = "Falta Trifásica"
-            porcentagem_falta = 100.0 * z_fase_A
+        # Classificando a falta
+        if len(fases_afetadas) == 3:
+            if terra:
+                tipo_falta = "FALTA TRIFÁSICA TERRA"
+            else:
+                tipo_falta = "FALTA TRIFÁSICA"
+        elif len(fases_afetadas) == 2:
+            if terra:
+                tipo_falta = "FALTA BIFÁSICA TERRA"
+            else:
+                tipo_falta = "FALTA BIFÁSICA"
+        elif len(fases_afetadas) == 1:
+            tipo_falta = "FALTA MONOFÁSICA"
         else:
-            tipo_falta = "Falta Trifásica para Terra"
-            porcentagem_falta = 100.0 * z_fase_A
+            tipo_falta = "NÃO HÁ FALTA"
 
-        return tipo_falta, porcentagem_falta
+        # Resultado
+        print(tipo_falta)
+        if fases_afetadas:
+            print("Fases afetadas:", ', '.join(fases_afetadas))
+        if terra:
+            print("Falta para terra detectada.")
+
+    def define_KF(fases_afetadas):
+         
+        if fases_afetadas == "A-T":
+            # Matriz KF_AT
+            KF = np.array([
+                [1, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0]
+            ])
+        elif fases_afetadas == "B-T":
+            # Matriz KF_BT
+            KF = np.array([
+                [0, 0, 0],
+                [0, 1, 0],
+                [0, 0, 0]
+            ])
+        elif fases_afetadas == "C-T":
+            # Matriz KF_CT
+            KF = np.array([
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 1]
+            ])
+        elif fases_afetadas == "AB":
+            # Matriz KF_AB
+            KF = np.array([
+                [1, -1, 0],
+                [-1, 1, 0],
+                [0, 0, 0]
+            ])
+        elif fases_afetadas == "BC":
+            # Matriz KF_BC
+            KF = np.array([
+                [0, 0, 0],
+                [0, 1, -1],
+                [0, -1, 1]
+            ])
+        elif fases_afetadas == "CA":
+            # Matriz KF_CA
+            KF = np.array([
+                [1, 0, -1],
+                [0, 0, 0],
+                [-1, 0, 1]
+            ])
+        elif fases_afetadas == "AB-T":
+            # Matriz KF_ABT
+            KF = np.array([
+                [2, -1, 0],
+                [-1, 2, 0],
+                [0, 0, 0]
+            ])
+
+        elif fases_afetadas == "BC-T":
+            # Matriz KF_BCT
+            KF = np.array([
+                [0, 0, 0],
+                [0, 2, -1],
+                [0, -1, 2]
+            ])
+
+        elif fases_afetadas == "CA-T":
+            # Matriz KF_CAT
+            KF = np.array([
+                [2, 0, -1],
+                [0, 0, 0],
+                [-1, 0, 2]
+            ])
+
+        elif fases_afetadas == "ABC":
+            # Matriz KF_ABC
+            KF = np.array([
+                [2, -1, -1],
+                [-1, 2, -1],
+                [-1, -1, 2]
+            ])
+
+        elif fases_afetadas == "ABC-T":
+            # Matriz KF_ABCT
+            KF = np.array([
+                [3, -1, -1],
+                [-1, 3, -1],
+                [-1, -1, 3]
+            ])
+
+        else:
+            raise ValueError(f"Fases afetadas '{fases_afetadas}' não reconhecido.")
+
+        # Retorna a matriz KF correspondente
+        return KF
+
+    def SAHA_1_Terminal_Fault_Location(fases_afetadas, I_terminal):
+
+        KF = processamento.define_KF(fases_afetadas)
+        Z_L = 1
+        I_G = I_terminal
+        I_G_PRE = I_terminal
+        Z_H = 1
+        Z_G = 1
+        V = 1
+        V_G = 1
+        IMP_GHL = Z_G + Z_H + Z_L
+        CUR_IGPRE = I_G + I_G_PRE
+       
+        A = np.dot(Z_L, KF, Z_L, I_G)
+        B = (np.dot(Z_L, KF, V,)+np.dot(Z_H, KF, Z_L, I_G))
+        C = np.dot((Z_L+Z_H), KF, V_G)
+        D = np.dot(IMP_GHL, CUR_IGPRE)
+
+    def Takagi_single_terminal(fases_afetadas, RMS, fault_time):
+        print("FASES AFETADAS", fases_afetadas)
+        print("fault time", fault_time)
+        if 'A' in fases_afetadas:
+            Vg_A = RMS[0][fault_time:]
+            Ig_pre_A = RMS[1][:fault_time]
+            Ig_pre_avrg_A = sum(Ig_pre_A)/len(Ig_pre_A)
+            Ig_A = RMS[1][fault_time:]
+            print("valoresA:",Ig_pre_avrg_A)
+            for i in range(len(Ig_A)):
+                Ig_A[i] = Ig_A[i]-Ig_pre_avrg_A
+        
+        if 'B' in fases_afetadas:
+            Vg_B = RMS[2][fault_time:]
+            Ig_pre_B = RMS[3][:fault_time]
+            Ig_pre_avrg_B = sum(Ig_pre_B)/len(Ig_pre_B)
+            Ig_B = RMS[1][fault_time:]
+            for i in range(len(Ig_B)):
+                Ig_B[i] = Ig_B[i]-Ig_pre_avrg_B
+        
+        if 'C' in fases_afetadas:
+            Vg_C = RMS[4][fault_time:]
+            Ig_pre_C = RMS[5][:fault_time]
+            Ig_pre_avrg_C = sum(Ig_pre_C)/len(Ig_pre_C)
+            Ig_C = RMS[1][fault_time:]
+            for i in range(len(Ig_C)):
+                Ig_C[i] = Ig_C[i]-Ig_pre_avrg_C
+        Z1_L = 0.0166+1j*0.2624
+       # Z1_L = np.array([0.0166+1j*0.2624, 0, 0],[0, 0.0166+1j*0.2624, 0],[0, 0, 0.0166+1j*0.2624])
+        for i in range(len(Ig_A)):
+            m = (Vg_A[i]*(-Ig_A[i])).imag/((Z1_L*(-Ig_A[i])*(Ig_A[i]+Ig_pre_avrg_A))).imag
+            print("LOCAL DA FALTA:", m)
+        
