@@ -9,6 +9,7 @@ from plot import*
 from datetime import datetime
 import matplotlib.pyplot as plt
 import heapq
+from sympy import Eq, solve, symbols
 
 # Obtém o diretório onde o script está localizado
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,19 +20,17 @@ CONFIG_FILE = os.path.join(script_dir, 'config.json')
 class processamento():
     def process(self, parametros, canais):
         processamento.init_process(self, parametros, canais)
-        print("003_____ REALIZANDO FILTRO")
+        print("002_____ REALIZANDO FILTRO")
         processamento.general_filter(self, parametros, canais)
-        print("004_____ REALIZANDO RMS")
+        print("003_____ REALIZANDO RMS")
         rms=processamento.general_rms(self, parametros, canais)
         print("004_____ REALIZANDO FASOR")
         signal, modulorms = processamento.general_fasor(self, parametros, canais)
-        print("005_____REALIZANDO LOCALIZAÇÃO DA FALTA")
-        processamento.general_fault_location(self, parametros, signal, rms)
-        print("006_____REALIZANDO COMPONENTES SIMETRICAS")
-        processamento.general_symmetrical_components(self, signal, modulorms)
-        print("007_____REALIZANDO COMPONENTES SIMETRICAS")
-        processamento.general_fault_location(self, parametros)
-        print("008_____ REALIZANDO IMPENDANCIA")
+        print("005_____REALIZANDO COMPONENTES SIMETRICAS")
+        seq_I,seq_I_2, Z_seq_r_1, Z_seq_i_1, Z_seq_r_2, Z_seq_i_2 = processamento.general_symmetrical_components(self, signal, modulorms, parametros)
+        print("006_____REALIZANDO LOCALIZAÇÃO DA FALTA")
+        processamento.general_fault_location(self, parametros, signal, rms, seq_I, seq_I_2, Z_seq_r_1, Z_seq_i_1, Z_seq_r_2, Z_seq_i_2)
+        print("007_____ REALIZANDO IMPENDANCIA")
         #processamento.general_impendace(self, parametros, canais)
        
     def init_process(self, parametros, canais):
@@ -42,7 +41,7 @@ class processamento():
         arquivo2 = parametros['arquivo2']
         freq_amostragem = float(parametros['freq_amostragem'])
         freq_corte_max = float(parametros['freq_corte_max'])
-        colunas_selecionadas = parametros['colunas']        
+        colunas_selecionadas = parametros['colunas']  
 
         self.rec = comtrade.Comtrade()
         try:
@@ -150,26 +149,29 @@ class processamento():
             index = index + 1
 
         print("004.1_____ CORRIGIR ANGULO")  
-        self.angulo = processamento.ang_correction(self.angulo)
+        #self.angulo = processamento.ang_correction(self.angulo)
         if plotar_fasores:
             plot_fasor(self.modulo, self.angulo, self.pasta_nome)
 
         return self.complexo, self.modulo
 
-    def general_symmetrical_components(self, signal, rms):
+    def general_symmetrical_components(self, signal, rms, parametros):
 
-        seq_V, seq_I = processamento.symmetrical_componentes(signal, rms)
-        #processamento.fault_detection(seq_I)
-        processamento.impedance_symmetrical_components(seq_V, seq_I)
+        seq_V, seq_I, seq_V_2, seq_I_2 = processamento.symmetrical_componentes(signal, rms)
+        print("TENSAOVALORES", seq_I[1])
+        Z_seq_r_1, Z_seq_i_1 = processamento.impedance_symmetrical_components(seq_V, seq_I, parametros)
+        Z_seq_r_2, Z_seq_i_2 = processamento.impedance_symmetrical_components(seq_V_2, seq_I_2, parametros)
+        #print("Z_SEQ_1", Z_seq_r_1[:300],Z_seq_i_1[:300])
+        #print("Z_SEQ_2", Z_seq_r_2[:300],Z_seq_i_2[:300])
+        return seq_I, seq_I_2, Z_seq_r_1, Z_seq_i_1, Z_seq_r_2, Z_seq_i_2
 
-    def general_fault_location(self, parametros, signal, rms):
+    def general_fault_location(self, parametros, signal, rms, seq_I, seq_I_2, Z_seq_r_1, Z_seq_i_1, Z_seq_r_2, Z_seq_i_2):
         # Obtém o valor da fase em falta do dicionário de parâmetros
         fases_afetadas = parametros.get('fase_em_falta', '')
-        # print("TAMANHOSINALFASOR", len(signal[1]))
-        # print("TAMANHOSINALRMS", len(rms[1]))
         fault_time = processamento.fault_detection(rms)
         #processamento.SAHA_1_Terminal_Fault_Location(fases_afetadas)
-        processamento.Takagi_single_terminal(fases_afetadas, signal, fault_time)
+        processamento.Takagi_single_terminal(parametros, fases_afetadas, signal, fault_time, seq_I)
+        processamento.Tziouvaras_two_terminals(parametros, fases_afetadas, signal, fault_time, seq_I, seq_I_2, Z_seq_r_1, Z_seq_i_1, Z_seq_r_2, Z_seq_i_2)
 
     def salvar_parametros(parametros):
         # Salvar os parâmetros existentes no JSON
@@ -374,10 +376,12 @@ class processamento():
 
         # Inicialização de uma lista para modulo e angulo da impedancia
         seq_voltage = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
-        seq_current = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]   
-
+        seq_current = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        seq_voltage_2 = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]
+        seq_current_2 = [[0] * len(complexo[0]) for _ in range(int(round(len(complexo))))]      
+        
         #Definição da porcentagem do filtro
-        filter_percentage = 0.05
+        filter_percentage = 0.10
 
         # Definição das matrizes de síntese e análise
         a = cmath.exp(2j * cmath.pi / 3)
@@ -408,9 +412,31 @@ class processamento():
             seq_current[1][i] = seq_I[1] if abs(seq_I[1]) > (rms[3][i]*filter_percentage) else 0
             seq_current[2][i] = seq_I[2] if abs(seq_I[2]) > (rms[5][i]*filter_percentage) else 0
 
-        return seq_voltage, seq_current
+            if len(complexo) >=7:
+                B_V_2 = np.array([complexo[6][i], complexo[8][i], complexo[10][i]])
 
-    def impedance_symmetrical_components(seq_V, seq_I):
+                B_I_2 = np.array([complexo[7][i], complexo[9][i], complexo[11][i]])
+
+                seq_V_2 = (1/3)*(np.dot(A, B_V_2))
+                seq_V_2 = seq_V_2.T
+
+                seq_I_2 = (1/3)*(np.dot(A, B_I_2))
+                seq_I_2 = seq_I_2.T
+
+                seq_voltage_2[0][i] = seq_V_2[0] if abs(seq_V_2[0]) > (rms[6][i]*filter_percentage) else 0
+                seq_voltage_2[1][i] = seq_V_2[1] if abs(seq_V_2[1]) > (rms[8][i]*filter_percentage) else 0   
+                seq_voltage_2[2][i] = seq_V_2[2] if abs(seq_V_2[2]) > (rms[10][i]*filter_percentage) else 0
+
+                seq_current_2[0][i] = seq_I_2[0] if abs(seq_I_2[0]) > (rms[7][i]*filter_percentage) else 0
+                seq_current_2[1][i] = seq_I_2[1] if abs(seq_I_2[1]) > (rms[9][i]*filter_percentage) else 0
+                seq_current_2[2][i] = seq_I_2[2] if abs(seq_I_2[2]) > (rms[11][i]*filter_percentage) else 0
+
+        return seq_voltage, seq_current, seq_voltage_2, seq_current_2
+
+    def impedance_symmetrical_components(seq_V, seq_I, parametros):
+
+        plotar_XR = parametros.get('plotar_XR', False)
+        plotar_Z_seq = parametros.get('plotar_Z_seq', False)
         
         seq_mod = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
         seq_ang = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]
@@ -420,7 +446,6 @@ class processamento():
         Z_seq_imag = [[0] * len(seq_V[0]) for _ in range(int(round(len(seq_V))))]  
 
         for i in range(0, len(seq_V[0])):    
-
             seq_mod[0][i], seq_ang[0][i] = cmath.polar(seq_V[0][i])
             seq_mod[1][i], seq_ang[1][i] = cmath.polar(seq_V[1][i])
             seq_mod[2][i], seq_ang[2][i] = cmath.polar(seq_V[2][i])
@@ -454,14 +479,18 @@ class processamento():
             Z_seq_imag[0][i] = Z_seq_mod[0][i] * np.sin(Z_seq_ang[0][i])
             Z_seq_imag[1][i] = Z_seq_mod[1][i] * np.sin(Z_seq_ang[1][i])
             Z_seq_imag[2][i] = Z_seq_mod[2][i] * np.sin(Z_seq_ang[2][i])
+
         Z_seq_r = np.array(Z_seq_real)
         Z_seq_i = np.array(Z_seq_imag)
         sinal_complex = Z_seq_r + 1j*Z_seq_i
+
+        #print(sinal_complex[2])
         #print("SINAL100", sinal_complex[0][100])
-       
-        plot_XR(sinal_complex,(0.0166*223.3),(0.2624*223.3),(0.4422*223.3),(223.3*1.3189))
-        #plot_Z_seq(seq_mod, seq_ang)
-        plot_Z_seq(Z_seq_mod, Z_seq_ang)
+        if plotar_XR:
+            plot_XR(sinal_complex, parametros)
+        if plotar_Z_seq:
+            plot_Z_seq(parametros, Z_seq_mod, Z_seq_ang)
+        return Z_seq_r, Z_seq_i
 
     def fault_detection(rms):
 
@@ -469,7 +498,7 @@ class processamento():
         time = (80/4800)
         for i in range(len(rms[1])):
             time+=(1/4800)
-            if (abs(rms[1][i+80])*fault_filter) < (abs(rms[1][i+84])):
+            if (abs(rms[1][i+80])*fault_filter) < (abs(rms[1][i+88])):
                 fault_time = i
                 break
         print("TEMPO DA FALTA", time)
@@ -651,36 +680,117 @@ class processamento():
         C = np.dot((Z_L+Z_H), KF, V_G)
         D = np.dot(IMP_GHL, CUR_IGPRE)
 
-    def Takagi_single_terminal(fases_afetadas, RMS, fault_time):
-        print("FASES AFETADAS", fases_afetadas)
-        print("fault time", fault_time)
+    def Takagi_single_terminal(parametros, fases_afetadas, RMS, fault_time, seq_I):
+        local_falta = []
+        plotar_LF = parametros.get('plotar_LF', False)
+        freq_amostragem = float(parametros['freq_amostragem'])
+        Z1_L = (parametros['dadoslinha']['R1']+1j* parametros['dadoslinha']['X1'])*parametros['dadoslinha']['L']
+        Z0_L = (parametros['dadoslinha']['R0']+1j* parametros['dadoslinha']['X0'])*parametros['dadoslinha']['L']
+        K= (Z0_L/Z1_L)-1
+
+        cycle_ms = round(0.010/(1/freq_amostragem))
+        prefault_ms = round(0.025/(1/freq_amostragem))
+        fix_ms = round(0.025/(1/freq_amostragem))
+        #print("inicio ig_preA", (cycle_ms)*0.000208)
+        #print("fim ig_preA", (fault_time-45)*0.000208)
+        # print("tamanho RMS 1:",len(RMS[1]))
+        #print("faulttime-tenms", fault_time - ten_ms)
         if 'A' in fases_afetadas:
-            Vg_A = RMS[0][fault_time:]
-            Ig_pre_A = RMS[1][:fault_time]
+            Vg_A = RMS[0][fault_time+fix_ms:(len(RMS[1]) - fix_ms)]
+            Ig_pre_A = RMS[1][cycle_ms:(fault_time-cycle_ms)]
             Ig_pre_avrg_A = sum(Ig_pre_A)/len(Ig_pre_A)
-            Ig_A = RMS[1][fault_time:]
-            print("valoresA:",Ig_pre_avrg_A)
+            Ig_A = RMS[1][fault_time+fix_ms:(len(RMS[1]) - fix_ms)]
             for i in range(len(Ig_A)):
                 Ig_A[i] = Ig_A[i]-Ig_pre_avrg_A
         
         if 'B' in fases_afetadas:
-            Vg_B = RMS[2][fault_time:]
-            Ig_pre_B = RMS[3][:fault_time]
+            Vg_B = RMS[2][fault_time+fix_ms:]
+            Ig_pre_B = RMS[3][130:((len(RMS[1]))-(fault_time-cycle_ms))]
             Ig_pre_avrg_B = sum(Ig_pre_B)/len(Ig_pre_B)
-            Ig_B = RMS[1][fault_time:]
+            Ig_B = RMS[3][fault_time+fix_ms:(len(RMS[1]) - fix_ms)]
             for i in range(len(Ig_B)):
                 Ig_B[i] = Ig_B[i]-Ig_pre_avrg_B
         
         if 'C' in fases_afetadas:
-            Vg_C = RMS[4][fault_time:]
-            Ig_pre_C = RMS[5][:fault_time]
+            Vg_C = RMS[4][fault_time+fix_ms:]
+            Ig_pre_C = RMS[5][130:((len(RMS[1]))-(fault_time-cycle_ms))]
             Ig_pre_avrg_C = sum(Ig_pre_C)/len(Ig_pre_C)
-            Ig_C = RMS[1][fault_time:]
+            Ig_C = RMS[5][fault_time+fix_ms:(len(RMS[1]) - fix_ms)]
             for i in range(len(Ig_C)):
                 Ig_C[i] = Ig_C[i]-Ig_pre_avrg_C
-        Z1_L = 0.0166+1j*0.2624
-       # Z1_L = np.array([0.0166+1j*0.2624, 0, 0],[0, 0.0166+1j*0.2624, 0],[0, 0, 0.0166+1j*0.2624])
-        for i in range(len(Ig_A)):
-            m = (Vg_A[i]*(-Ig_A[i])).imag/((Z1_L*(-Ig_A[i])*(Ig_A[i]+Ig_pre_avrg_A))).imag
-            print("LOCAL DA FALTA:", m)
+
+        if fases_afetadas == 'A-T':
+            for i in range(len(Ig_A)):
+                m = abs(((Vg_A[i]*(Ig_A[i].conjugate())).imag)/((Z1_L*(Ig_A[i].conjugate())*(Ig_A[i]+Ig_pre_avrg_A+(K*seq_I[0][fault_time+fix_ms+i]))).imag)) #MONOFASICO
+                local_falta.append(m)
         
+        if fases_afetadas == 'B-T':
+            for i in range(len(Ig_B)):
+                m = abs(((Vg_B[i]*(Ig_B[i].conjugate())).imag)/((Z1_L*(Ig_B[i].conjugate())*(Ig_B[i]+Ig_pre_avrg_B+(K*seq_I[0][fault_time+fix_ms+i]))).imag)) #MONOFASICO
+                local_falta.append(m)
+
+        if fases_afetadas == 'C-T':
+             for i in range(len(Ig_C)):
+                 m = abs(((Vg_C[i]*(Ig_C[i].conjugate())).imag)/((Z1_L*(Ig_C[i].conjugate())*(Ig_C[i]+Ig_pre_avrg_C+(K*seq_I[0][fault_time+fix_ms+i]))).imag)) #MONOFASICO
+                 local_falta.append(m)
+        
+        if fases_afetadas == 'AB' or fases_afetadas == 'AB-T' or fases_afetadas == 'ABC' or fases_afetadas == 'ABC-T':
+            for i in range(len(Ig_A)):
+                m = abs((((Vg_A[i]-Vg_B[i])*((Ig_A[i]-Ig_B[i]).conjugate())).imag)/((Z1_L*((Ig_A[i]+Ig_pre_avrg_A-Ig_B[i]-Ig_pre_avrg_B))*((Ig_A[i]-Ig_B[i]).conjugate())).imag)) #MONOFASICO
+                local_falta.append(m)
+
+        limiar_estabilidade = 0.1 
+        fault_time_2 = fault_time + fix_ms
+        final_local_falta = None
+        for j in range(1, len(local_falta[fault_time_2:(len(local_falta) - cycle_ms)])):
+            diferenca = abs(local_falta[fault_time_2+j] - local_falta[fault_time_2+j - 1])
+            if diferenca < limiar_estabilidade:
+                final_local_falta = sum(local_falta[fault_time_2+j:(len(local_falta) - cycle_ms)]) / len(local_falta[fault_time_2+j:(len(local_falta) - cycle_ms)])
+                break 
+        print("LOCAL DA FALTA FOI", final_local_falta)
+
+        #print("LOCAL DA FALTA A/B/C:", m)
+        if plotar_LF:
+            plot_local_falta(local_falta,len(local_falta))
+        
+    def Tziouvaras_two_terminals(parametros, fases_afetadas, RMS, fault_time, seq_I, seq_I_2, Z_seq_r_1, Z_seq_i_1, Z_seq_r_2, Z_seq_i_2):
+
+        m = symbols('m')
+        a = []
+        b = []
+        c = []
+        d = []
+        e = []
+        f = []
+        Z1_L = (parametros['dadoslinha']['R1']+1j* parametros['dadoslinha']['X1'])*parametros['dadoslinha']['L']
+        Z0_L = (parametros['dadoslinha']['R0']+1j* parametros['dadoslinha']['X0'])*parametros['dadoslinha']['L']
+        Z2_L = Z1_L
+
+        #METODO RUFINI
+        # Z_seq_1 = (-0.096)+(1j*82.181)-(Z2_L)/2
+        # Z_seq_0 = 4.032+(1j*124.611)-(Z2_L)/2
+
+        Z_seq_1 = (-0.096)+(1j*86.481)-(Z2_L)/2
+        Z_seq_0 = 4.032+(1j*127.611)-(Z2_L)/2
+        #Z_seq_0 = Z_seq_1
+        for j in range(len(seq_I[1])):
+            a.append((seq_I[2][j]*(Z_seq_1)).real)
+            b.append((seq_I[2][j]*(Z_seq_1)).imag)
+            c.append((seq_I[2][j]*(Z2_L)).real)
+            d.append((seq_I[2][j]*(Z2_L)).imag)
+            e.append((Z_seq_0 + Z2_L).real) 
+            f.append((Z_seq_0 + Z2_L).imag) 
+        g = Z2_L.real
+        h = Z2_L.imag
+
+        for i in range(len(seq_I[1])):
+                
+            A = (abs(seq_I_2[2][i])**2) * (g**2 + h**2) - (c[i]**2 + d[i]**2)
+            B = -2 *(abs(seq_I_2[2][i])**2) * (e[i]*g + f[i]*h) - 2 * (a[i]*c[i] + b[i]*d[i])
+            C = (abs(seq_I_2[2][i])**2) * (e[i]**2 + f[i]**2) - (a[i]**2 + b[i]**2)
+            equacao = Eq(A * m**2 + B * m + C, 0)
+            solucoes = solve(equacao, m)
+            modulos = [abs(solucao) for solucao in solucoes]
+            
+            #print(modulos)
+            #print(solucoes)

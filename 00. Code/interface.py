@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, Button, Entry, Listbox, MULTIPLE, ttk
+from PIL import Image, ImageTk
 import comtrade
 import json
 import os
@@ -23,32 +24,53 @@ class JanelaSelecaoArquivos:
         self.R0 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('R0', 0.0))
         self.X0 = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('X0', 0.0))
         self.L = tk.DoubleVar(value=parametros.get('dadoslinha', {}).get('L', 0.0))
-
-        # Continua com o restante da inicialização...
         self.entries_caracteristicas = {}
         self.colunas = []
         self.criar_interface()
 
     def criar_interface(self):
-        self.root.title("Selecionar Arquivos COMTRADE")
+        self.root.title("BLOC - Localizador de Faltas")
         self.root.state('zoomed')  # Maximiza a janela
+        # Obtém o caminho completo para a imagem na mesma pasta do código
+        caminho_imagem = os.path.join(os.path.dirname(__file__), "Wallpaper.jpg")
+
+        # Carrega e redimensiona a imagem de fundo
+        imagem_fundo = Image.open(caminho_imagem)
+        largura, altura = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        imagem_fundo = imagem_fundo.resize((largura, altura), Image.LANCZOS)
+        imagem_fundo = ImageTk.PhotoImage(imagem_fundo)
+        label_fundo = tk.Label(self.root, image=imagem_fundo)
+        label_fundo.place(x=0, y=0, relwidth=1, relheight=1)
+        label_fundo.image = imagem_fundo 
+
+        titulo = tk.Label(self.root, text="Universidade Federal de Itajubá", fg="white", bg="#244A7A", font=("Arial", 10), borderwidth=0)
+        titulo.pack(pady=5)
+        subtitulo = tk.Label(self.root, text="BLOC - Localizador de Faltas", font=("Arial", 18, "bold"), fg="white", bg="#244A7A")
+        subtitulo.pack(pady=7)
+
+        frame_autores = tk.Frame(self.root, bg="#244A7A")  # Frame com fundo da mesma cor
+        frame_autores.pack(side="bottom", pady=7)  # Posiciona na parte inferior com algum espaçamento
+        self.autores = tk.Label(frame_autores, text="Desenvolvido por:", font=("Arial", 8, "bold"), fg="white", bg="#244A7A")
+        self.autores.pack()
+        self.autores1 = tk.Label(frame_autores, text="Vinícius Ferreira Alves & Luis Gustavo Rufino de Souza", font=("Arial", 10, "bold"), fg="white", bg="#244A7A")
+        self.autores1.pack()
 
         # Configura o restante da interface conforme já feito
-        label_instrucao = tk.Label(self.root, text="Selecione ou insira manualmente os caminhos dos arquivos COMTRADE")
+        label_instrucao = tk.Label(self.root, text="Selecione ou insira manualmente os caminhos dos arquivos COMTRADE", fg="white", bg="#244A7A")
         label_instrucao.pack(pady=10)
 
-        frame_arquivo1 = tk.Frame(self.root)
+        frame_arquivo1 = tk.Frame(self.root, bg="#244A7A")
         frame_arquivo1.pack(pady=10)
-        label_arquivo1 = tk.Label(frame_arquivo1, text="Arquivo .CFG:")
+        label_arquivo1 = tk.Label(frame_arquivo1, text="Arquivo .CFG:", fg="white", bg="#244A7A", borderwidth=0, highlightthickness=0)
         label_arquivo1.grid(row=0, column=0, padx=5, sticky="w")
         self.entry_arquivo1 = tk.Entry(frame_arquivo1, textvariable=self.arquivo1, width=50)
         self.entry_arquivo1.grid(row=0, column=1, padx=5, sticky="w")
         button_selecionar1 = tk.Button(frame_arquivo1, text="Selecionar", command=self.selecionar_arquivo1)
         button_selecionar1.grid(row=0, column=2, padx=5)
 
-        frame_arquivo2 = tk.Frame(self.root)
+        frame_arquivo2 = tk.Frame(self.root, bg="#244A7A")
         frame_arquivo2.pack(pady=10)
-        label_arquivo2 = tk.Label(frame_arquivo2, text="Arquivo .DAT:")
+        label_arquivo2 = tk.Label(frame_arquivo2, text="Arquivo .DAT:", fg="white", bg="#244A7A", borderwidth=0, highlightthickness=0)
         label_arquivo2.grid(row=0, column=0, padx=5, sticky="w")
         self.entry_arquivo2 = tk.Entry(frame_arquivo2, textvariable=self.arquivo2, width=50)
         self.entry_arquivo2.grid(row=0, column=1, padx=5, sticky="w")
@@ -57,48 +79,53 @@ class JanelaSelecaoArquivos:
 
         # Botão de Carregar Arquivo logo abaixo das entradas
         button_carregar = tk.Button(self.root, text="Carregar Arquivo", command=self.carregar_colunas)
-        button_carregar.pack(pady=10)
+        button_carregar.pack(pady=5)
 
         # Adiciona caixas de texto e seus rótulos com as características da linha
-        frame_caracteristicas = tk.Frame(self.root)
-        frame_caracteristicas.pack(pady=10)
-        tk.Label(frame_caracteristicas, text="Características da Linha").grid(row=0, column=0, columnspan=3, pady=5)
+        frame_caracteristicas = tk.Frame(self.root, bg="#244A7A")
+        frame_caracteristicas.pack(pady=5)
+        tk.Label(frame_caracteristicas, text="Características da Linha", fg="white", bg="#244A7A").grid(row=0, column=0, columnspan=3, pady=5)
 
         # Adiciona caixas de texto e seus rótulos com as características da linha
         for i, (label, unit) in enumerate([("R1", "Ω/km"), ("X1", "Ω/km"), ("R0", "Ω/km"), ("X0", "Ω/km"), ("L", "km")]):
-            tk.Label(frame_caracteristicas, text=f"{label}").grid(row=i+1, column=0, padx=5, sticky="w")
+            tk.Label(frame_caracteristicas, text=f"{label}", fg="white", bg="#244A7A").grid(row=i+1, column=0, padx=5, sticky="w")
             entry = tk.Entry(frame_caracteristicas, width=15)
             entry.grid(row=i+1, column=1, padx=5, sticky="w")
-            entry.insert(0, str(self.parametros.get('dadoslinha', {}).get(label, 0.0)))  # Insere o valor salvo no JSON
-            tk.Label(frame_caracteristicas, text=unit).grid(row=i+1, column=2, padx=5, sticky="w")
-            self.entries_caracteristicas[label] = entry  # Salva a referência à caixa de entrada
+            entry.insert(0, str(self.parametros.get('dadoslinha', {}).get(label, 0.0)))
+            tk.Label(frame_caracteristicas, text=unit, fg="white", bg="#244A7A").grid(row=i+1, column=2, padx=5, sticky="w")
+            self.entries_caracteristicas[label] = entry 
 
         # Caixas de entrada de frequências
-        frame_frequencias = tk.Frame(self.root)
-        frame_frequencias.pack(pady=10)
-        label_freq_amostragem = tk.Label(frame_frequencias, text="Frequência de Amostragem (Hz):")
+        frame_frequencias = tk.Frame(self.root, bg="#244A7A")
+        frame_frequencias.pack(pady=2)
+        label_freq_amostragem = tk.Label(frame_frequencias, text="Frequência de Amostragem (Hz):", fg="white", bg="#244A7A")
         label_freq_amostragem.grid(row=0, column=0, padx=5, sticky="w")
         entry_freq_amostragem = tk.Entry(frame_frequencias, textvariable=self.freq_amostragem, width=15)
         entry_freq_amostragem.grid(row=0, column=1, padx=5, sticky="w")
 
-        label_freq_max = tk.Label(frame_frequencias, text="Frequência de Corte Máxima (Hz):")
+        label_freq_max = tk.Label(frame_frequencias, text="Frequência de Corte Máxima (Hz):", fg="white", bg="#244A7A")
         label_freq_max.grid(row=1, column=0, padx=5, sticky="w")
         entry_freq_max = tk.Entry(frame_frequencias, textvariable=self.freq_corte_max, width=15)
         entry_freq_max.grid(row=1, column=1, padx=5, sticky="w")
 
+        # Criar um frame para as listas suspensas
+        frame_listas = tk.Frame(self.root, bg="#244A7A")
+        frame_listas.pack(pady=5)  # Você pode usar pack aqui para o frame
+
         # Lista suspensa para o tipo de falta
         self.opcao_fase.set(self.parametros.get('fase_em_falta', ''))  # Preenche com o valor salvo no JSON
-        label_opcao_fase = tk.Label(self.root, text="Selecione as fases em falta:")
-        label_opcao_fase.pack(pady=10)
-        self.combo_fase = ttk.Combobox(self.root, textvariable=self.opcao_fase, values=["A-T", "B-T","C-T","AB","AC","BC","AB-T","AC-T","BC-T","ABC","ABC-T"], state="readonly")
-        self.combo_fase.pack(pady=10)
+        label_opcao_fase = tk.Label(frame_listas, text="Selecione as fases em falta:", fg="white", bg="#244A7A")  # Mudei para o frame
+        label_opcao_fase.grid(row=0, column=0, padx=10, pady=2, sticky="w")  # Reduzi o pady para 2
+        self.combo_fase = ttk.Combobox(frame_listas, textvariable=self.opcao_fase, values=["A-T", "B-T", "C-T", "AB", "AC", "BC", "AB-T", "AC-T", "BC-T", "ABC", "ABC-T"], state="readonly")
+        self.combo_fase.grid(row=0, column=1, padx=10, pady=2, sticky="w")  # Reduzi o pady para 2
 
         # Lista suspensa para número de terminais
         self.opcao_terminal = tk.StringVar(value="")
-        label_opcao_terminal = tk.Label(self.root, text="Selecione o número de terminais:")
-        label_opcao_terminal.pack(pady=10)
-        self.combo_terminal = ttk.Combobox(self.root, textvariable=self.opcao_terminal, values=["1 Terminal", "2 Terminais"], state="readonly")
-        self.combo_terminal.pack(pady=10)
+        label_opcao_terminal = tk.Label(frame_listas, text="Selecione o número de terminais:", fg="white", bg="#244A7A")  # Mudei para o frame
+        label_opcao_terminal.grid(row=1, column=0, padx=10, pady=2, sticky="w")  # Reduzi o pady para 2
+        self.combo_terminal = ttk.Combobox(frame_listas, textvariable=self.opcao_terminal, values=["1 Terminal", "2 Terminais"], state="readonly")
+        self.combo_terminal.grid(row=1, column=1, padx=10, pady=2, sticky="w")  # Reduzi o pady para 2
+
 
         # Adicionando as listas suspensas (inicia com valor vazio)
         self.frames_listas = []
@@ -106,7 +133,7 @@ class JanelaSelecaoArquivos:
         self.listas_corrente = []
 
         for i in range(6):
-            frame_lista = tk.Frame(self.root)
+            frame_lista = tk.Frame(self.root, bg="#244A7A")
             self.frames_listas.append(frame_lista)
             lista_tensao = tk.StringVar()
             lista_corrente = tk.StringVar()
@@ -114,39 +141,48 @@ class JanelaSelecaoArquivos:
             self.listas_corrente.append(lista_corrente)
             rotulo_tensao = ["øA", "øB", "øC", "øA", "øB", "øC"][i]  # Nomes alternativos
             rotulo_corrente = ["øA", "øB", "øC", "øA", "øB", "øC"][i]  # Nomes alternativos
-            tk.Label(frame_lista, text=f"Tensão {rotulo_tensao}").grid(row=0, column=0)
+            tk.Label(frame_lista, text=f"Tensão {rotulo_tensao}", fg="white", bg="#244A7A").grid(row=0, column=0)
             opcao_tensao = ttk.Combobox(frame_lista, textvariable=lista_tensao, state="readonly")
             opcao_tensao.grid(row=0, column=1, padx=5)
-            tk.Label(frame_lista, text=f"Corrente {rotulo_corrente}").grid(row=0, column=2)
+            tk.Label(frame_lista, text=f"Corrente {rotulo_corrente}", fg="white", bg="#244A7A").grid(row=0, column=2)
             opcao_corrente = ttk.Combobox(frame_lista, textvariable=lista_corrente, state="readonly")
             opcao_corrente.grid(row=0, column=3, padx=5)
             frame_lista.opcao_tensao = opcao_tensao
             frame_lista.opcao_corrente = opcao_corrente
 
         # Adicionando Checkboxes
-        self.checkbox_frame = tk.Frame(self.root)
+        self.checkbox_frame = tk.Frame(self.root, bg="#244A7A")
         self.checkbox_frame.pack_forget()  # Esconde o frame inicialmente
 
-        self.label_checkboxes = tk.Label(self.checkbox_frame, text="Seleção de gráficos:")
-        self.label_checkboxes.grid(row=0, column=0, columnspan=3)
+        self.label_checkboxes = tk.Label(self.checkbox_frame, text="Seleção de gráficos:", fg="white", bg="#244A7A", font=("bold"))
+        self.label_checkboxes.grid(row=0, column=0, columnspan=6)
 
         # Criação dos checkboxes
         self.plotar_filtro = tk.BooleanVar(value=False)
         self.plotar_rms = tk.BooleanVar(value=False)
         self.plotar_fasores = tk.BooleanVar(value=False)
+        self.plotar_XR = tk.BooleanVar(value=False)
+        self.plotar_Z_seq = tk.BooleanVar(value=False)
+        self.plotar_LF = tk.BooleanVar(value=False)
 
-        self.checkbox_filtro = tk.Checkbutton(self.checkbox_frame, text="Sinal pós filtro", variable=self.plotar_filtro)
-        self.checkbox_rms = tk.Checkbutton(self.checkbox_frame, text="RMS", variable=self.plotar_rms)
-        self.checkbox_fasores = tk.Checkbutton(self.checkbox_frame, text="Fasores", variable=self.plotar_fasores)
+        self.checkbox_filtro = tk.Checkbutton(self.checkbox_frame, text="Filtro inicial", fg="white", bg="#244A7A", selectcolor="black", activebackground="#244A7A", activeforeground="white", highlightthickness=0, variable=self.plotar_filtro)
+        self.checkbox_rms = tk.Checkbutton(self.checkbox_frame, text="RMS", fg="white", bg="#244A7A", selectcolor="black", activebackground="#244A7A", activeforeground="white", highlightthickness=0, variable=self.plotar_rms)
+        self.checkbox_fasores = tk.Checkbutton(self.checkbox_frame, text="Fasores", fg="white", bg="#244A7A", selectcolor="black", activebackground="#244A7A", activeforeground="white", highlightthickness=0, variable=self.plotar_fasores)
+        self.checkbox_XR = tk.Checkbutton(self.checkbox_frame, text="X/R", fg="white", bg="#244A7A", selectcolor="black", activebackground="#244A7A", activeforeground="white", highlightthickness=0, variable=self.plotar_XR)
+        self.checkbox_Z_seq = tk.Checkbutton(self.checkbox_frame, text="Comp. Simétricas", fg="white", bg="#244A7A", selectcolor="black", activebackground="#244A7A", activeforeground="white", highlightthickness=0, variable=self.plotar_Z_seq)
+        self.checkbox_LF= tk.Checkbutton(self.checkbox_frame, text="Local da Falta", fg="white", bg="#244A7A", selectcolor="black", activebackground="#244A7A", activeforeground="white", highlightthickness=0, variable=self.plotar_LF)
 
         # Posiciona os checkboxes
-        self.checkbox_filtro.grid(row=1, column=0, padx=5, pady=5)
-        self.checkbox_rms.grid(row=1, column=1, padx=5, pady=5)
-        self.checkbox_fasores.grid(row=1, column=2, padx=5, pady=5)
+        self.checkbox_filtro.grid(row=1, column=0, padx=5, pady=3)
+        self.checkbox_rms.grid(row=1, column=1, padx=5, pady=3)
+        self.checkbox_fasores.grid(row=1, column=2, padx=5, pady=3)
+        self.checkbox_XR.grid(row=1, column=3, padx=5, pady=3)
+        self.checkbox_Z_seq.grid(row=1, column=4, padx=5, pady=3)
+        self.checkbox_LF.grid(row=1, column=5, padx=5, pady=3)
 
         # Botão Confirmar, inicialmente escondido
         self.botao_confirmar = tk.Button(self.root, text="Confirmar", command=self.confirmar)
-        self.botao_confirmar.pack(pady=20)
+        self.botao_confirmar.pack(pady=10)
         self.botao_confirmar.pack_forget()  # Esconde o botão
 
         # Configurando para chamar 'atualizar_interface' quando o valor da Combobox mudar
@@ -176,7 +212,7 @@ class JanelaSelecaoArquivos:
     def exibir_listas_terminal(self, num_listas, titulo_terminal1=False, titulo_terminal2=False):
         if titulo_terminal1:
             if not hasattr(self, 'label_terminal1'):
-                self.label_terminal1 = tk.Label(self.root, text="Terminal 1", font=("Helvetica", 12, "bold"))
+                self.label_terminal1 = tk.Label(self.root, text="Terminal 1", fg="white", bg="#244A7A", font=("Helvetica", 12, "bold"))
             self.label_terminal1.pack(pady=10)
 
         for i in range(min(num_listas, 3)):
@@ -184,7 +220,7 @@ class JanelaSelecaoArquivos:
 
         if titulo_terminal2:
             if not hasattr(self, 'label_terminal2'):
-                self.label_terminal2 = tk.Label(self.root, text="Terminal 2", font=("Helvetica", 12, "bold"))
+                self.label_terminal2 = tk.Label(self.root, text="Terminal 2", fg="white", bg="#244A7A", font=("Helvetica", 12, "bold"))
             self.label_terminal2.pack(pady=10)
             for i in range(3, num_listas):
                 self.frames_listas[i].pack(pady=5)
@@ -231,14 +267,10 @@ class JanelaSelecaoArquivos:
 
         # Adiciona os dados ao dicionário de parâmetros
         self.parametros['dadoslinha'] = dados_linha
-
-        # Atualiza os outros parâmetros
         self.parametros['arquivo1'] = self.arquivo1.get()
         self.parametros['arquivo2'] = self.arquivo2.get()
         self.parametros['freq_amostragem'] = self.freq_amostragem.get()
         self.parametros['freq_corte_max'] = self.freq_corte_max.get()
-
-        # Adiciona a fase em falta ao dicionário de parâmetros
         self.parametros['fase_em_falta'] = self.opcao_fase.get()
 
         # Coleta as colunas selecionadas das listas suspensas
@@ -257,12 +289,12 @@ class JanelaSelecaoArquivos:
         self.parametros['plotar_filtro'] = self.plotar_filtro.get()
         self.parametros['plotar_rms'] = self.plotar_rms.get()
         self.parametros['plotar_fasores'] = self.plotar_fasores.get()
-
+        self.parametros['plotar_XR'] = self.plotar_XR.get()
+        self.parametros['plotar_Z_seq'] = self.plotar_Z_seq.get()
+        self.parametros['plotar_LF'] = self.plotar_LF.get()
         # Salva os parâmetros no arquivo JSON
         processamento.salvar_parametros(self.parametros)
         self.initial()
-
-    
 
     def initial(self):
         processamento.process(self, self.parametros, self.colunas)
